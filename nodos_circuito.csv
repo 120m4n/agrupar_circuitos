@@ -1,0 +1,13 @@
+id_nodo,nombre,tipo,voltaje_kv,x,y
+1001,Subestacion_Principal,Subestacion,34.5,-70.65,-33.45
+1002,Apoyo_MT_001,Apoyo,34.5,-70.651,-33.451
+1003,Apoyo_MT_002,Apoyo,34.5,-70.652,-33.452
+1004,Derivacion_001,Derivacion,34.5,-70.653,-33.453
+1005,Apoyo_MT_003,Apoyo,34.5,-70.654,-33.454
+1006,Transformador_001,Transformador,13.8,-70.655,-33.455
+2001,Apoyo_Rama_A_001,Apoyo,34.5,-70.6515,-33.4515
+2002,Apoyo_Rama_A_002,Apoyo,34.5,-70.652,-33.452
+2003,Apoyo_Rama_A_003,Apoyo,34.5,-70.6525,-33.4525
+2004,Transformador_002,Transformador,13.8,-70.653,-33.453
+3001,Apoyo_Rama_B_001,Apoyo,34.5,-70.6535,-33.4535
+3002,Transformador_003,Transformador,13.8,-70.654,-33.454
