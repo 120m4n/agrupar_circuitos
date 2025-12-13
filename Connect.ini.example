@@ -1,0 +1,106 @@
+# ============================================================================
+# Archivo de Configuración para Exportación desde Oracle
+# ============================================================================
+# 
+# INSTRUCCIONES:
+# 1. Copiar este archivo como "Connect.ini"
+# 2. Completar los valores de configuración
+# 3. NUNCA subir Connect.ini al repositorio (está en .gitignore)
+# 4. Por seguridad, usar Oracle Wallet en lugar de contraseña en texto plano
+#
+# ============================================================================
+
+[ORACLE]
+# Configuración de conexión a Oracle
+# -----------------------------------
+# Servidor y puerto de Oracle
+host = servidor.empresa.com
+port = 1521
+
+# Nombre del servicio Oracle
+service_name = ORCL
+
+# Usuario de conexión
+username = usuario_app
+
+# Contraseña (OPCIONAL - recomendado usar wallet)
+# ADVERTENCIA: No almacenar contraseñas en texto plano en producción
+# password = contraseña_app
+
+# Ubicación de Oracle Wallet (RECOMENDADO para producción)
+# El wallet debe contener las credenciales de forma segura
+wallet_location = /ruta/a/wallet
+
+# Timeout de conexión en segundos (opcional)
+connection_timeout = 30
+
+
+[DATABASE]
+# Nombres de objetos en la base de datos
+# ---------------------------------------
+# Nombre del package a ejecutar
+package_name = AGRUPAR_CIRCUITOS
+
+# Nombre de la tabla de nodos
+node_table = HIT_NODE
+
+# Nombre de la tabla de líneas/segmentos
+line_table = HIT_LINE
+
+# Esquema donde están los objetos (opcional)
+schema = ESQUEMA_ELECTRICO
+
+# Filtros adicionales (opcional)
+# Ejemplo: circuit_filter = WHERE circuit_id = 'MT-001'
+circuit_filter = 
+
+
+[OUTPUT]
+# Configuración de archivos de salida
+# ------------------------------------
+# Directorio de salida para archivos CSV
+output_dir = ./
+
+# Nombre del archivo CSV de nodos
+node_csv = nodos_circuito.csv
+
+# Nombre del archivo CSV de segmentos
+segment_csv = segmentos_circuito.csv
+
+# Codificación de archivos de salida
+encoding = utf-8
+
+# Sobrescribir archivos existentes (true/false)
+overwrite = true
+
+
+[LOGGING]
+# Configuración de logging
+# -------------------------
+# Nivel de logging: DEBUG, INFO, WARNING, ERROR, CRITICAL
+log_level = INFO
+
+# Archivo de log
+log_file = oracle_export.log
+
+# Tamaño máximo del archivo de log en MB (para rotación)
+max_log_size_mb = 10
+
+# Número de archivos de backup de log
+log_backup_count = 5
+
+
+[ADVANCED]
+# Configuración avanzada (opcional)
+# ----------------------------------
+# Tamaño de chunk para lectura de grandes volúmenes
+chunk_size = 10000
+
+# Reintentos en caso de error temporal
+max_retries = 3
+
+# Delay entre reintentos en segundos
+retry_delay = 5
+
+# Habilitar modo debug (más verboso)
+debug_mode = false

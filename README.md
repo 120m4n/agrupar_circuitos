@@ -6,7 +6,9 @@ Es útil para la gestión de activos, planificación de mantenimiento y análisi
 
 ## 📋 Características
 
-- **Carga de Datos**: Ingesta de datos desde archivos CSV (`segmentos_circuito.csv`, `nodos_circuito.csv`). Genera datos de prueba si no existen.
+- **Carga de Datos**: 
+  - Ingesta de datos desde archivos CSV (`segmentos_circuito.csv`, `nodos_circuito.csv`). Genera datos de prueba si no existen.
+  - **🆕 Exportación desde Oracle**: Funcionalidad documentada para generar CSV desde base de datos Oracle (ver [Documentación Oracle](#-exportación-desde-oracle)).
 - **Modelado de Red**: Construcción de un grafo no dirigido ponderado utilizando `NetworkX`.
 - **Agrupación Inteligente**: 
   - Utiliza un recorrido DFS para recorrer la red desde la subestación.
@@ -99,4 +101,59 @@ flowchart TD
     style AD fill:#f9f,stroke:#333
     style O fill:#bfb,stroke:#333
     style Q fill:#fbb,stroke:#333
+```
+
+## 🔌 Exportación desde Oracle
+
+### ⚠️ Estado: DOCUMENTADO - NO IMPLEMENTADO
+
+Este proyecto incluye **documentación completa** para una funcionalidad de exportación de datos desde base de datos Oracle, que permite generar archivos CSV 100% compatibles con el formato esperado por `agrupar_circuitos.py`.
+
+### Características Documentadas
+
+- 📄 **Conexión a Oracle**: Mediante archivo de configuración `Connect.ini`
+- 📦 **Ejecución de Package**: Ejecuta el package Oracle `AGRUPAR_CIRCUITOS`
+- 📊 **Extracción de Datos**: Descarga información de tablas `HIT_NODE` y `HIT_LINE`
+- 💾 **Generación de CSV**: Produce archivos `nodos_circuito.csv` y `segmentos_circuito.csv`
+- 🎯 **Ejecución Standalone**: Puede ejecutarse independientemente o integrarse como módulo
+- 🏗️ **Arquitectura Funcional**: Diseño modular con programación funcional
+
+### Documentación Completa
+
+Para detalles completos sobre arquitectura, implementación, configuración y uso, consultar:
+
+📖 **[oracle_export_documentation.md](oracle_export_documentation.md)**
+
+La documentación incluye:
+- Arquitectura detallada del módulo
+- Formato del archivo `Connect.ini`
+- Especificaciones de cada componente funcional
+- Mapeo de tablas Oracle → CSV
+- Interfaz de línea de comandos
+- Ejemplos de integración
+- Casos de prueba
+- Consideraciones de seguridad
+- Diagramas de flujo y secuencia
+
+### Requisitos para Implementación Futura
+
+Cuando se implemente, requerirá:
+- Oracle Instant Client
+- Python 3.8+
+- Librería `cx_Oracle`
+- Acceso a base de datos Oracle con tablas `HIT_NODE` y `HIT_LINE`
+- Package Oracle `AGRUPAR_CIRCUITOS`
+
+### Ejemplo de Uso Futuro
+
+```bash
+# Configurar conexión
+cp Connect.ini.example Connect.ini
+# Editar Connect.ini con credenciales
+
+# Generar CSV desde Oracle (una vez implementado)
+python oracle_export.py
+
+# Usar con agrupar_circuitos.py
+python agrupar_circuitos.py
 ```
