@@ -42,9 +42,11 @@ connection_timeout = 30
 package_name = AGRUPAR_CIRCUITOS
 
 # Nombre de la tabla de nodos
+# NOTA: Estos son nombres de ejemplo. Verificar con DBA los nombres reales.
 node_table = HIT_NODE
 
 # Nombre de la tabla de líneas/segmentos
+# NOTA: Estos son nombres de ejemplo. Verificar con DBA los nombres reales.
 line_table = HIT_LINE
 
 # Esquema donde están los objetos (opcional)

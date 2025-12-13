@@ -19,6 +19,7 @@ import sys
 from typing import Dict, Tuple, Any, Union, TYPE_CHECKING
 
 # Conditional import for pandas (only for type checking)
+# When implementing, replace with: import pandas as pd
 if TYPE_CHECKING:
     import pandas as pd
 
