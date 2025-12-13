@@ -1,0 +1,46 @@
+# Oracle connection configuration
+Connect.ini
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Output files
+*.log
+oracle_export.log
+
+# Generated CSV files (optional - comment out if you want to commit them)
+# nodos_circuito.csv
+# segmentos_circuito.csv
+grupos_1km.csv
+segmentos_con_grupo.csv
+
+# GIS output files
+*.geojson
+*.png
+red_electrica_grupos.png
+segmentos_con_grupos.geojson
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+*.ipynb
+
+# OS specific
+.DS_Store
+Thumbs.db
