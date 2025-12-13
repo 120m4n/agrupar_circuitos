@@ -63,7 +63,6 @@ print("\n📊 RESUMEN INICIAL:")
 print(f"• Longitud total de circuitos: {df_segmentos['longitud_m'].sum()/1000:.2f} km")
 print(f"• Segmento más largo: {df_segmentos['longitud_m'].max():.1f} m")
 print(f"• Segmento más corto: {df_segmentos['longitud_m'].min():.1f} m")
-print(f"• Número de derivaciones: {len(df_nodos[df_nodos['tipo'] == 'Derivacion'])}")
 
 # ============================================================================
 # 2. CONSTRUIR GRAFO CON NETWORKX
@@ -231,48 +230,7 @@ class RedElectrica:
               f"{len(segmentos)} segmentos, "
               f"{longitud_total:.1f}m ({longitud_total/1000:.2f}km)")
     
-    def dfs_por_ramas(self, longitud_objetivo_m: float = 1000.0) -> Dict:
-        """
-        DFS que procesa cada rama por separado (para redes ramificadas)
-        """
-        nodo_inicio = self.encontrar_subestacion_principal()
-        
-        # Encontrar todas las ramas (caminos desde la subestación a transformadores)
-        transformadores = [n for n, attr in self.G.nodes(data=True) 
-                          if attr['tipo'] == 'Transformador']
-        
-        grupos_por_rama = {}
-        
-        for tf in transformadores:
-            try:
-                # Encontrar camino desde subestación a transformador
-                camino = nx.shortest_path(self.G, nodo_inicio, tf, weight='longitud_m')
-                
-                # Obtener segmentos en este camino
-                segmentos_camino = []
-                for i in range(len(camino)-1):
-                    segmento_data = self.G.get_edge_data(camino[i], camino[i+1])
-                    segmentos_camino.append({
-                        'segmento_id': segmento_data['id_segmento'],
-                        'longitud_m': segmento_data['longitud_m'],
-                        'nodo_inicio': camino[i],
-                        'nodo_fin': camino[i+1]
-                    })
-                
-                # Agrupar segmentos del camino en tramos de ~1km
-                grupos_rama = self._agrupar_camino(segmentos_camino, longitud_objetivo_m)
-                grupos_por_rama[tf] = grupos_rama
-                
-                print(f"\n   Rama hacia transformador {tf}:")
-                print(f"   Camino: {len(camino)} nodos, "
-                      f"{sum(s['longitud_m'] for s in segmentos_camino)/1000:.2f}km")
-                print(f"   Grupos formados: {len(grupos_rama)}")
-                
-            except nx.NetworkXNoPath:
-                print(f"   ⚠️  No hay camino al transformador {tf}")
-        
-        return grupos_por_rama
-    
+
     def _agrupar_camino(self, segmentos: List, longitud_objetivo: float) -> List:
         """Agrupar segmentos de un camino en tramos de longitud objetivo"""
         grupos = []
@@ -426,14 +384,9 @@ def main():
     # Opción 1: DFS simple (agrupa a lo largo del recorrido)
     grupos = red.dfs_agrupar_segmentos(
         longitud_objetivo_m=1000.0,  # 1km
-        tolerancia_km=0.2  # ±200m
+        tolerancia_km=0.1  # ±100m
     )
     
-    # Opción 2: DFS por ramas (descomentar para usar)
-    # print("\n" + "=" * 70)
-    # print("🌳 AGRUPANDO POR RAMAS (DFS POR CAMINOS)")
-    # print("=" * 70)
-    # grupos_por_rama = red.dfs_por_ramas(longitud_objetivo_m=1000.0)
     
     # 3. Analizar resultados
     red.analizar_resultados()
@@ -500,75 +453,6 @@ def main():
     • Usa el campo 'grupo_id' para simbología
     • Calcula estadísticas por grupo en tu GIS
     """)
-
-# ============================================================================
-# 4. FUNCIONES ADICIONALES PARA ANÁLISIS AVANZADO
-# ============================================================================
-def analisis_avanzado(red: RedElectrica):
-    """Funciones adicionales para análisis avanzado"""
-    
-    print("\n" + "=" * 70)
-    print("🧠 ANÁLISIS AVANZADO CON NETWORKX")
-    print("=" * 70)
-    
-    # 1. Encontrar todos los caminos desde subestación a transformadores
-    subestacion = red.encontrar_subestacion_principal()
-    transformadores = [n for n, attr in red.G.nodes(data=True) 
-                      if attr['tipo'] == 'Transformador']
-    
-    print(f"\n🔍 CAMINOS DESDE SUBESTACIÓN {subestacion}:")
-    for tf in transformadores:
-        try:
-            caminos = list(nx.all_simple_paths(red.G, subestacion, tf, cutoff=10))
-            print(f"   → Transformador {tf}: {len(caminos)} caminos posibles")
-            
-            # Camino más corto
-            camino_corto = nx.shortest_path(red.G, subestacion, tf, weight='longitud_m')
-            longitud = sum(
-                red.G[u][v]['longitud_m'] 
-                for u, v in zip(camino_corto[:-1], camino_corto[1:])
-            )
-            print(f"     Camino más corto: {len(camino_corto)} nodos, {longitud/1000:.2f}km")
-            
-        except nx.NetworkXNoPath:
-            print(f"   → Transformador {tf}: Sin camino")
-    
-    # 2. Calcular centralidad de intermediación (betweenness)
-    print(f"\n📊 CENTRALIDAD DE INTERMEDIACIÓN:")
-    betweenness = nx.betweenness_centrality(red.G, weight='longitud_m')
-    
-    # Top 5 nodos más críticos
-    top_criticos = sorted(betweenness.items(), key=lambda x: x[1], reverse=True)[:5]
-    for nodo, valor in top_criticos:
-        nombre = red.G.nodes[nodo]['nombre']
-        tipo = red.G.nodes[nodo]['tipo']
-        print(f"   Nodo {nodo} ({nombre}, {tipo}): {valor:.4f}")
-    
-    # 3. Detectar ciclos en la red
-    ciclos = list(nx.cycle_basis(red.G))
-    print(f"\n🔄 CICLOS EN LA RED: {len(ciclos)} ciclos detectados")
-    if ciclos:
-        for i, ciclo in enumerate(ciclos[:3]):  # Mostrar solo primeros 3
-            print(f"   Ciclo {i+1}: {ciclo} ({len(ciclo)} nodos)")
-    
-    # 4. Análisis de robustez
-    print(f"\n💪 ANÁLISIS DE ROBUSTEZ:")
-    
-    # Nodos críticos (de corte)
-    nodos_corte = list(nx.articulation_points(red.G))
-    print(f"   Nodos de corte (articulación): {len(nodos_corte)}")
-    if nodos_corte:
-        for nodo in list(nodos_corte)[:5]:
-            nombre = red.G.nodes[nodo]['nombre']
-            print(f"     • Nodo {nodo}: {nombre}")
-    
-    # Puentes (aristas críticas)
-    puentes = list(nx.bridges(red.G))
-    print(f"   Puentes (segmentos críticos): {len(puentes)}")
-    if puentes:
-        for u, v in list(puentes)[:5]:
-            longitud = red.G[u][v]['longitud_m']
-            print(f"     • Segmento {u}-{v}: {longitud}m")
 
 # ============================================================================
 # EJECUCIÓN
