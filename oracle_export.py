@@ -316,10 +316,12 @@ def create_connection(config: Dict[str, Any]) -> OracleConnection:
         return conn
         
     except cx_Oracle.Error as e:
-        error_obj, = e.args
-        raise OracleConnectionError(
-            f"Error al conectar a Oracle: {error_obj.message}"
-        )
+        # Safely extract error message
+        if e.args and len(e.args) > 0:
+            error_msg = str(e.args[0]) if hasattr(e.args[0], '__str__') else str(e)
+        else:
+            error_msg = str(e)
+        raise OracleConnectionError(f"Error al conectar a Oracle: {error_msg}")
 
 
 def test_connection(conn: OracleConnection) -> bool:
@@ -430,10 +432,12 @@ def execute_package(
         return True
         
     except cx_Oracle.Error as e:
-        error_obj, = e.args
-        raise PackageExecutionError(
-            f"Error al ejecutar package {qualified_name}: {error_obj.message}"
-        )
+        # Safely extract error message
+        if e.args and len(e.args) > 0:
+            error_msg = str(e.args[0]) if hasattr(e.args[0], '__str__') else str(e)
+        else:
+            error_msg = str(e)
+        raise PackageExecutionError(f"Error al ejecutar package {qualified_name}: {error_msg}")
 
 
 def check_package_exists(
@@ -1186,12 +1190,14 @@ Para más información, consultar oracle_export_documentation.md
                     config['DATABASE']['package_name'] = ''
             
             # Write temporary config
-            import tempfile
             with tempfile.NamedTemporaryFile(mode='w', suffix='.ini', delete=False) as f:
                 temp_config = f.name
                 config_parser = configparser.ConfigParser()
                 for section, values in config.items():
-                    config_parser[section] = values
+                    config_parser[section] = {}
+                    # Convert all values to strings for ConfigParser
+                    for key, value in values.items():
+                        config_parser[section][key] = str(value)
                 config_parser.write(f)
             
             config_file = temp_config
