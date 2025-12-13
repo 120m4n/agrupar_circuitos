@@ -410,6 +410,8 @@ def execute_package(
         cursor = conn.cursor()
         
         # Sanitize identifiers to prevent SQL injection
+        # Note: Package names cannot be parameterized in PL/SQL blocks
+        # Using sanitize_identifier() which validates against strict regex
         safe_package = sanitize_identifier(package_name)
         
         # Build qualified name
@@ -421,6 +423,7 @@ def execute_package(
         
         # Execute package - assuming it's a procedure without parameters
         # If the package needs parameters, they should be added here
+        # Using f-string is safe here because qualified_name has been sanitized
         sql = f"BEGIN {qualified_name}; END;"
         
         logging.info(f"Ejecutando package: {qualified_name}")
@@ -513,6 +516,8 @@ def extract_nodes(
     """
     try:
         # Sanitize identifiers to prevent SQL injection
+        # Note: Table names cannot be parameterized in SQL, so we use sanitize_identifier()
+        # which validates against a strict regex pattern to prevent injection
         safe_table = sanitize_identifier(table_name)
         
         if schema:
@@ -523,6 +528,7 @@ def extract_nodes(
         
         # Query - using generic column names as per documentation
         # These mappings should be adjusted based on actual Oracle schema
+        # Using f-string is safe here because qualified_name has been sanitized
         sql = f"""
             SELECT 
                 node_id AS id_nodo,
@@ -567,6 +573,8 @@ def extract_lines(
     """
     try:
         # Sanitize identifiers to prevent SQL injection
+        # Note: Table names cannot be parameterized in SQL, so we use sanitize_identifier()
+        # which validates against a strict regex pattern to prevent injection
         safe_table = sanitize_identifier(table_name)
         
         if schema:
@@ -577,6 +585,7 @@ def extract_lines(
         
         # Query - using generic column names as per documentation
         # These mappings should be adjusted based on actual Oracle schema
+        # Using f-string is safe here because qualified_name has been sanitized
         sql = f"""
             SELECT 
                 line_id AS id_segmento,
@@ -707,8 +716,14 @@ def transform_lines(df_raw: pd.DataFrame) -> pd.DataFrame:
         if col not in df.columns:
             raise DataValidationError(f"Falta la columna requerida: {col}")
     
-    # Convert data types
+    # Convert data types - handle NaN values before int conversion
+    # First convert id_segmento safely
+    df['id_segmento'] = pd.to_numeric(df['id_segmento'], errors='coerce')
+    if df['id_segmento'].isna().any():
+        logging.warning("Hay valores NaN en id_segmento, se eliminarán esas filas")
+        df = df.dropna(subset=['id_segmento'])
     df['id_segmento'] = df['id_segmento'].astype(int)
+    
     df['nodo_inicio'] = df['nodo_inicio'].astype(str)  # Consistent with nodes
     df['nodo_fin'] = df['nodo_fin'].astype(str)
     df['longitud_m'] = pd.to_numeric(df['longitud_m'], errors='coerce')
@@ -1177,39 +1192,45 @@ Para más información, consultar oracle_export_documentation.md
             sys.exit(1)
         
         # Read and modify config if needed
-        if args.output_dir or args.skip_package:
-            config = read_config(args.config)
+        temp_config_file = None
+        try:
+            if args.output_dir or args.skip_package:
+                config = read_config(args.config)
+                
+                if args.output_dir:
+                    if 'OUTPUT' not in config:
+                        config['OUTPUT'] = {}
+                    config['OUTPUT']['output_dir'] = args.output_dir
+                
+                if args.skip_package:
+                    if 'DATABASE' in config:
+                        config['DATABASE']['package_name'] = ''
+                
+                # Write temporary config
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.ini', delete=False) as f:
+                    temp_config_file = f.name
+                    config_parser = configparser.ConfigParser()
+                    for section, values in config.items():
+                        config_parser[section] = {}
+                        # Convert all values to strings for ConfigParser
+                        for key, value in values.items():
+                            config_parser[section][key] = str(value)
+                    config_parser.write(f)
+                
+                config_file = temp_config_file
+            else:
+                config_file = args.config
             
-            if args.output_dir:
-                if 'OUTPUT' not in config:
-                    config['OUTPUT'] = {}
-                config['OUTPUT']['output_dir'] = args.output_dir
-            
-            if args.skip_package:
-                if 'DATABASE' in config:
-                    config['DATABASE']['package_name'] = ''
-            
-            # Write temporary config
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.ini', delete=False) as f:
-                temp_config = f.name
-                config_parser = configparser.ConfigParser()
-                for section, values in config.items():
-                    config_parser[section] = {}
-                    # Convert all values to strings for ConfigParser
-                    for key, value in values.items():
-                        config_parser[section][key] = str(value)
-                config_parser.write(f)
-            
-            config_file = temp_config
-        else:
-            config_file = args.config
+            # Run pipeline
+            result = oracle_to_csv_pipeline(config_file)
         
-        # Run pipeline
-        result = oracle_to_csv_pipeline(config_file)
-        
-        # Cleanup temp config
-        if args.output_dir or args.skip_package:
-            os.unlink(config_file)
+        finally:
+            # Cleanup temp config in finally block to ensure cleanup even on error
+            if temp_config_file and os.path.exists(temp_config_file):
+                try:
+                    os.unlink(temp_config_file)
+                except Exception as e:
+                    logging.warning(f"No se pudo eliminar archivo temporal: {e}")
         
         # Exit with appropriate code
         if result['success']:
