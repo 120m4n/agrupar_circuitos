@@ -28,10 +28,10 @@ from logging.handlers import RotatingFileHandler
 # Import pandas
 import pandas as pd
 
-# Try to import cx_Oracle, but allow module to load without it
+# Try to import oracledb, but allow module to load without it
 try:
-    import cx_Oracle
-    from cx_Oracle import Connection as OracleConnection
+    import oracledb as cx_Oracle
+    from oracledb import Connection as OracleConnection
     ORACLE_AVAILABLE = True
 except ImportError:
     ORACLE_AVAILABLE = False
@@ -280,14 +280,17 @@ def create_connection(config: Dict[str, Any]) -> OracleConnection:
     """
     if not ORACLE_AVAILABLE:
         raise OracleConnectionError(
-            "cx_Oracle no está instalado. Instalar con: pip install cx_Oracle\n"
-            "También requiere Oracle Instant Client instalado en el sistema."
+            "oracledb no está instalado. Instalar con: pip install oracledb\n"
+            "Para conexiones básicas no requiere Oracle Instant Client."
         )
     
     oracle_config = config['ORACLE']
     
     try:
+
+        cx_Oracle.init_oracle_client(lib_dir=oracle_config.get('instant_client_path'))
         # Build DSN
+        
         dsn = cx_Oracle.makedsn(
             oracle_config['host'],
             oracle_config['port'],
@@ -1170,13 +1173,13 @@ Para más información, consultar oracle_export_documentation.md
         # Check if cx_Oracle is available
         if not ORACLE_AVAILABLE:
             logging.error("=" * 70)
-            logging.error("ERROR: cx_Oracle no está instalado")
+            logging.error("ERROR: oracledb no está instalado")
             logging.error("=" * 70)
             logging.error("")
-            logging.error("Para usar este módulo, debe instalar cx_Oracle:")
-            logging.error("  pip install cx_Oracle")
+            logging.error("Para usar este módulo, debe instalar oracledb:")
+            logging.error("  pip install oracledb")
             logging.error("")
-            logging.error("También requiere Oracle Instant Client instalado:")
+            logging.error("Para modo thick requiere Oracle Instant Client instalado:")
             logging.error("  https://www.oracle.com/database/technologies/instant-client.html")
             logging.error("")
             sys.exit(1)
