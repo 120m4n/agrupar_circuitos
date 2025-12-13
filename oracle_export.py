@@ -19,6 +19,8 @@ import time
 import logging
 import argparse
 import configparser
+import tempfile
+import re
 from typing import Dict, Tuple, Any, Union, List, Generator
 from contextlib import contextmanager
 from logging.handlers import RotatingFileHandler
@@ -29,8 +31,8 @@ import pandas as pd
 # Try to import cx_Oracle, but allow module to load without it
 try:
     import cx_Oracle
+    from cx_Oracle import Connection as OracleConnection
     ORACLE_AVAILABLE = True
-    OracleConnection = OracleConnection
 except ImportError:
     ORACLE_AVAILABLE = False
     cx_Oracle = None
@@ -116,6 +118,42 @@ def export_from_oracle(
         return df_nodos, df_segmentos
     else:
         return result['files']
+
+
+# ============================================================================
+# UTILITY FUNCTIONS
+# ============================================================================
+
+def sanitize_identifier(identifier: str) -> str:
+    """
+    Sanitiza identificadores SQL (nombres de tablas, esquemas, packages) 
+    para prevenir SQL injection.
+    
+    Args:
+        identifier: Nombre de tabla, esquema o package
+        
+    Returns:
+        Identificador sanitizado
+        
+    Raises:
+        ValueError: Si el identificador contiene caracteres no válidos
+    """
+    if not identifier:
+        raise ValueError("El identificador no puede estar vacío")
+    
+    # Oracle identifiers can contain letters, numbers, underscore, $, #
+    # and must start with a letter
+    if not re.match(r'^[A-Za-z][A-Za-z0-9_$#]*$', identifier):
+        raise ValueError(
+            f"Identificador SQL inválido: {identifier}. "
+            f"Solo se permiten letras, números, _, $, # y debe iniciar con letra"
+        )
+    
+    # Limit length (Oracle max is 30 chars for most identifiers)
+    if len(identifier) > 30:
+        raise ValueError(f"Identificador demasiado largo (max 30 caracteres): {identifier}")
+    
+    return identifier
 
 
 # ============================================================================
@@ -369,8 +407,15 @@ def execute_package(
     try:
         cursor = conn.cursor()
         
+        # Sanitize identifiers to prevent SQL injection
+        safe_package = sanitize_identifier(package_name)
+        
         # Build qualified name
-        qualified_name = f"{schema}.{package_name}" if schema else package_name
+        if schema:
+            safe_schema = sanitize_identifier(schema)
+            qualified_name = f"{safe_schema}.{safe_package}"
+        else:
+            qualified_name = safe_package
         
         # Execute package - assuming it's a procedure without parameters
         # If the package needs parameters, they should be added here
@@ -410,6 +455,7 @@ def check_package_exists(
     try:
         cursor = conn.cursor()
         
+        # Use parameterized queries - already safe from SQL injection
         if schema:
             sql = """
                 SELECT COUNT(*) 
@@ -418,7 +464,8 @@ def check_package_exists(
                   AND object_name = :package_name 
                   AND object_type = 'PACKAGE'
             """
-            cursor.execute(sql, schema=schema.upper(), package_name=package_name.upper())
+            # Fix: use dictionary or tuple, not mixed
+            cursor.execute(sql, {'schema': schema.upper(), 'package_name': package_name.upper()})
         else:
             sql = """
                 SELECT COUNT(*) 
@@ -426,7 +473,7 @@ def check_package_exists(
                 WHERE object_name = :package_name 
                   AND object_type = 'PACKAGE'
             """
-            cursor.execute(sql, package_name=package_name.upper())
+            cursor.execute(sql, {'package_name': package_name.upper()})
         
         count = cursor.fetchone()[0]
         cursor.close()
@@ -461,7 +508,14 @@ def extract_nodes(
         DataExtractionError: Si falla la consulta
     """
     try:
-        qualified_name = f"{schema}.{table_name}" if schema else table_name
+        # Sanitize identifiers to prevent SQL injection
+        safe_table = sanitize_identifier(table_name)
+        
+        if schema:
+            safe_schema = sanitize_identifier(schema)
+            qualified_name = f"{safe_schema}.{safe_table}"
+        else:
+            qualified_name = safe_table
         
         # Query - using generic column names as per documentation
         # These mappings should be adjusted based on actual Oracle schema
@@ -508,7 +562,14 @@ def extract_lines(
         DataExtractionError: Si falla la consulta
     """
     try:
-        qualified_name = f"{schema}.{table_name}" if schema else table_name
+        # Sanitize identifiers to prevent SQL injection
+        safe_table = sanitize_identifier(table_name)
+        
+        if schema:
+            safe_schema = sanitize_identifier(schema)
+            qualified_name = f"{safe_schema}.{safe_table}"
+        else:
+            qualified_name = safe_table
         
         # Query - using generic column names as per documentation
         # These mappings should be adjusted based on actual Oracle schema
@@ -647,7 +708,13 @@ def transform_lines(df_raw: pd.DataFrame) -> pd.DataFrame:
     df['nodo_inicio'] = df['nodo_inicio'].astype(str)  # Consistent with nodes
     df['nodo_fin'] = df['nodo_fin'].astype(str)
     df['longitud_m'] = pd.to_numeric(df['longitud_m'], errors='coerce')
-    df['capacidad_amp'] = pd.to_numeric(df['capacidad_amp'], errors='coerce').astype(int)
+    
+    # Handle NaN values in capacidad_amp before converting to int
+    df['capacidad_amp'] = pd.to_numeric(df['capacidad_amp'], errors='coerce')
+    if df['capacidad_amp'].isna().any():
+        logging.warning("Hay valores NaN en capacidad_amp, se eliminarán esas filas")
+        df = df.dropna(subset=['capacidad_amp'])
+    df['capacidad_amp'] = df['capacidad_amp'].astype(int)
     
     # Check for nulls in required fields
     if df[['id_segmento', 'id_circuito', 'nodo_inicio', 'nodo_fin']].isna().any().any():
