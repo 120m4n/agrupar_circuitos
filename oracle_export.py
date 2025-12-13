@@ -391,50 +391,49 @@ def execute_package(
     schema: str = None
 ) -> bool:
     """
-    Ejecuta el package Oracle especificado.
+    Ejecuta el procedimiento Oracle especificado.
     
     Args:
         conn: Conexión activa a Oracle
-        package_name: Nombre del package a ejecutar (ej. "AGRUPAR_CIRCUITOS")
+        package_name: Nombre del package (ej. "AGRUPAR_CIRCUITOS")
         schema: Esquema donde está el package (opcional)
         
     Returns:
         True si la ejecución fue exitosa
         
     Raises:
-        PackageExecutionError: Si falla la ejecución del package
+        PackageExecutionError: Si falla la ejecución del procedimiento
         
     Notas:
-        - El package debe existir en la base de datos
+        - El procedimiento debe existir en la base de datos
         - Debe tener los permisos necesarios para ejecutarlo
-        - Puede tener parámetros IN/OUT según diseño del package
+        - Se ejecuta como CALL schema.package.procedure()
     """
     try:
         cursor = conn.cursor()
         
         # Sanitize identifiers to prevent SQL injection
-        # Note: Package names cannot be parameterized in PL/SQL blocks
-        # Using sanitize_identifier() which validates against strict regex
+        # Note: Procedure names cannot be parameterized in SQL, so we use sanitize_identifier()
+        # which validates against strict regex pattern to prevent injection
         safe_package = sanitize_identifier(package_name)
         
-        # Build qualified name
+        # Build qualified name with procedure
         if schema:
             safe_schema = sanitize_identifier(schema)
-            qualified_name = f"{safe_schema}.{safe_package}"
+            qualified_name = f"{safe_schema}.{safe_package}.PROCESAR"
         else:
-            qualified_name = safe_package
+            qualified_name = f"{safe_package}.PROCESAR"
         
-        # Execute package - assuming it's a procedure without parameters
-        # If the package needs parameters, they should be added here
+        # Execute procedure using CALL syntax
         # Using f-string is safe here because qualified_name has been sanitized
-        sql = f"BEGIN {qualified_name}; END;"
+        sql = f"CALL {qualified_name}();"
         
-        logging.info(f"Ejecutando package: {qualified_name}")
+        logging.info(f"Ejecutando procedimiento: {qualified_name}")
         cursor.execute(sql)
         conn.commit()
         cursor.close()
         
-        logging.info(f"✓ Package ejecutado exitosamente")
+        logging.info(f"✓ Procedimiento ejecutado exitosamente")
         return True
         
     except cx_Oracle.Error as e:
@@ -443,7 +442,7 @@ def execute_package(
             error_msg = str(e.args[0]) if hasattr(e.args[0], '__str__') else str(e)
         else:
             error_msg = str(e)
-        raise PackageExecutionError(f"Error al ejecutar package {qualified_name}: {error_msg}")
+        raise PackageExecutionError(f"Error al ejecutar procedimiento {qualified_name}: {error_msg}")
 
 
 def check_package_exists(
@@ -1002,7 +1001,7 @@ def oracle_to_csv_pipeline(config_file: str = "Connect.ini") -> Dict[str, Any]:
     Flujo:
         1. Leer configuración
         2. Conectar a Oracle
-        3. Ejecutar package AGRUPAR_CIRCUITOS
+        3. Ejecutar procedimiento AGRUPAR_CIRCUITOS.PROCESAR
         4. Extraer datos de HIT_NODE y HIT_LINE
         5. Transformar y validar datos
         6. Generar archivos CSV
@@ -1041,7 +1040,7 @@ def oracle_to_csv_pipeline(config_file: str = "Connect.ini") -> Dict[str, Any]:
             if not test_connection(conn):
                 raise OracleConnectionError("La conexión no está activa")
             
-            # 3. Ejecutar package
+            # 3. Ejecutar procedimiento
             db_config = config['DATABASE']
             if db_config.get('package_name'):
                 execute_package(
@@ -1126,7 +1125,7 @@ Ejemplos de uso:
   python oracle_export.py
   python oracle_export.py --config /ruta/a/config.ini
   python oracle_export.py --config Connect.ini --verbose
-  python oracle_export.py --output-dir ./data --skip-package
+  python oracle_export.py --output-dir ./data --skip-procedure
 
 Para más información, consultar oracle_export_documentation.md
         """
@@ -1158,9 +1157,9 @@ Para más información, consultar oracle_export_documentation.md
     )
     
     parser.add_argument(
-        '--skip-package',
+        '--skip-procedure',
         action='store_true',
-        help='No ejecutar package Oracle'
+        help='No ejecutar procedimiento Oracle'
     )
     
     args = parser.parse_args()
@@ -1197,7 +1196,7 @@ Para más información, consultar oracle_export_documentation.md
         # Read and modify config if needed
         temp_config_file = None
         try:
-            if args.output_dir or args.skip_package:
+            if args.output_dir or args.skip_procedure:
                 config = read_config(args.config)
                 
                 if args.output_dir:
@@ -1205,7 +1204,7 @@ Para más información, consultar oracle_export_documentation.md
                         config['OUTPUT'] = {}
                     config['OUTPUT']['output_dir'] = args.output_dir
                 
-                if args.skip_package:
+                if args.skip_procedure:
                     if 'DATABASE' in config:
                         config['DATABASE']['package_name'] = ''
                 
