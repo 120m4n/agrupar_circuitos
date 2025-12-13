@@ -30,9 +30,11 @@ import pandas as pd
 try:
     import cx_Oracle
     ORACLE_AVAILABLE = True
+    OracleConnection = OracleConnection
 except ImportError:
     ORACLE_AVAILABLE = False
     cx_Oracle = None
+    OracleConnection = Any  # Fallback type for when cx_Oracle is not available
 
 
 class OracleExportError(Exception):
@@ -225,7 +227,7 @@ def validate_config(config: Dict[str, Any]) -> bool:
 # MÓDULO 2: CONEXIÓN ORACLE
 # ============================================================================
 
-def create_connection(config: Dict[str, Any]) -> cx_Oracle.Connection:
+def create_connection(config: Dict[str, Any]) -> OracleConnection:
     """
     Establece conexión con la base de datos Oracle.
     
@@ -282,7 +284,7 @@ def create_connection(config: Dict[str, Any]) -> cx_Oracle.Connection:
         )
 
 
-def test_connection(conn: cx_Oracle.Connection) -> bool:
+def test_connection(conn: OracleConnection) -> bool:
     """
     Verifica que la conexión esté activa.
     
@@ -302,7 +304,7 @@ def test_connection(conn: cx_Oracle.Connection) -> bool:
         return False
 
 
-def close_connection(conn: cx_Oracle.Connection) -> None:
+def close_connection(conn: OracleConnection) -> None:
     """
     Cierra la conexión de forma segura.
     
@@ -318,7 +320,7 @@ def close_connection(conn: cx_Oracle.Connection) -> None:
 
 
 @contextmanager
-def oracle_connection(config: Dict[str, Any]) -> Generator[cx_Oracle.Connection, None, None]:
+def oracle_connection(config: Dict[str, Any]) -> Generator[OracleConnection, None, None]:
     """
     Context manager para gestión automática de conexión.
     
@@ -341,7 +343,7 @@ def oracle_connection(config: Dict[str, Any]) -> Generator[cx_Oracle.Connection,
 # ============================================================================
 
 def execute_package(
-    conn: cx_Oracle.Connection,
+    conn: OracleConnection,
     package_name: str,
     schema: str = None
 ) -> bool:
@@ -390,7 +392,7 @@ def execute_package(
 
 
 def check_package_exists(
-    conn: cx_Oracle.Connection,
+    conn: OracleConnection,
     package_name: str,
     schema: str = None
 ) -> bool:
@@ -440,7 +442,7 @@ def check_package_exists(
 # ============================================================================
 
 def extract_nodes(
-    conn: cx_Oracle.Connection,
+    conn: OracleConnection,
     table_name: str = "HIT_NODE",
     schema: str = None
 ) -> pd.DataFrame:
@@ -486,7 +488,7 @@ def extract_nodes(
 
 
 def extract_lines(
-    conn: cx_Oracle.Connection,
+    conn: OracleConnection,
     table_name: str = "HIT_LINE",
     schema: str = None
 ) -> pd.DataFrame:
@@ -534,7 +536,7 @@ def extract_lines(
 
 
 def extract_data(
-    conn: cx_Oracle.Connection,
+    conn: OracleConnection,
     config: Dict[str, Any]
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
