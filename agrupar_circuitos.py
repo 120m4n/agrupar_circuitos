@@ -388,100 +388,114 @@ class RedElectrica:
 # ============================================================================
 # 3. EJECUCIÓN PRINCIPAL
 # ============================================================================
-def main(input_dir, output_dir):
+def main(input_dir='./data', output_dir='./data'):
     """
     Función principal de ejecución
     
     Args:
-        input_dir: Directorio de entrada para archivos CSV
-        output_dir: Directorio de salida para archivos generados
+        input_dir: Directorio de entrada para archivos CSV (default: './data')
+        output_dir: Directorio de salida para archivos generados (default: './data')
+        
+    Returns:
+        Dict con resultados del proceso:
+        {
+            'success': bool,
+            'grupos': dict,
+            'red': RedElectrica instance,
+            'stats': {
+                'num_grupos': int,
+                'num_segmentos': int,
+                'num_nodos': int
+            },
+            'error': str (optional, only if success=False)
+        }
     """
-    
-    # Cargar datos
-    df_segmentos, df_nodos = cargar_datos_csv(input_dir)
-    
-    # Crear instancia de la red eléctrica
-    print("\n\n🔗 PASO 2: CONSTRUYENDO GRAFO CON NETWORKX...")
-    red = RedElectrica()
-    
-    # 1. Cargar datos al grafo
-    red.cargar_datos(df_segmentos, df_nodos)
-    
-    print("\n" + "=" * 70)
-    print("🔍 ANÁLISIS TOPOLÓGICO INICIAL")
-    print("=" * 70)
-    
-    # Análisis básico del grafo
-    print(f"\n📐 PROPIEDADES DEL GRAFO:")
-    print(f"   • Es conexo: {nx.is_connected(red.G)}")
-    print(f"   • Número de componentes conexos: {nx.number_connected_components(red.G)}")
-    print(f"   • Diámetro: {nx.diameter(red.G) if nx.is_connected(red.G) else 'N/A'}")
-    print(f"   • Densidad: {nx.density(red.G):.4f}")
-    
-    # 2. Agrupar segmentos usando DFS
-    print("\n" + "=" * 70)
-    print("🔄 EJECUTANDO DFS PARA AGRUPAR SEGMENTOS")
-    print("=" * 70)
-    
-    # Opción 1: DFS simple (agrupa a lo largo del recorrido)
-    grupos = red.dfs_agrupar_segmentos(
-        longitud_objetivo_m=1000.0,  # 1km
-        tolerancia_km=0.1  # ±100m
-    )
-    
-    
-    # 3. Analizar resultados
-    red.analizar_resultados(output_dir)
-    
-    # 4. Exportar para GIS
-    print("\n" + "=" * 70)
-    print("🗺️  PREPARANDO DATOS PARA GIS")
-    print("=" * 70)
-    
-    # Crear GeoDataFrame para exportar a Shapefile/GeoJSON
-    import geopandas as gpd
-    from shapely.geometry import LineString
-    
-    # Datos de ejemplo de coordenadas (en realidad usarías tus coordenadas reales)
-    # Aquí asumimos que los nodos tienen coordenadas x,y
-    geometrias = []
-    atributos = []
-    
-    for u, v, data in red.G.edges(data=True):
-        # Obtener coordenadas de los nodos
-        u_pos = red.G.nodes[u]['pos']
-        v_pos = red.G.nodes[v]['pos']
+    try:
+        # Cargar datos
+        df_segmentos, df_nodos = cargar_datos_csv(input_dir)
         
-        # Crear LineString
-        linea = LineString([u_pos, v_pos])
-        geometrias.append(linea)
+        # Crear instancia de la red eléctrica
+        print("\n\n🔗 PASO 2: CONSTRUYENDO GRAFO CON NETWORKX...")
+        red = RedElectrica()
         
-        # Atributos
-        atributos.append({
-            'id_segmento': data['id_segmento'],
-            'grupo_id': red.segmentos_por_grupo.get(data['id_segmento'], -1),
-            'longitud_m': data['longitud_m'],
-            'tipo_conductor': data['tipo_conductor'],
-            'circuito': data['id_circuito'],
-            'nodo_inicio': u,
-            'nodo_fin': v
-        })
-    
-    gdf = gpd.GeoDataFrame(atributos, geometry=geometrias, crs="EPSG:4326")
-    geojson_path = os.path.join(output_dir, 'segmentos_con_grupos.geojson')
-    gpkg_path = os.path.join(output_dir, 'segmentos_con_grupos.gpkg')
-    gdf.to_file(geojson_path, driver='GeoJSON')
-    gdf.to_file(gpkg_path, driver='GPKG')
-    
-    print(f"✅ GeoJSON exportado: '{geojson_path}'")
-    print(f"✅ GeoPackage exportado: '{gpkg_path}'")
-    print(f"   {len(gdf)} segmentos con información de grupo")
-    
-    # Resumen final
-    print("\n" + "=" * 70)
-    print("✅ PROCESO COMPLETADO EXITOSAMENTE")
-    print("=" * 70)
-    print(f"""
+        # 1. Cargar datos al grafo
+        red.cargar_datos(df_segmentos, df_nodos)
+        
+        print("\n" + "=" * 70)
+        print("🔍 ANÁLISIS TOPOLÓGICO INICIAL")
+        print("=" * 70)
+        
+        # Análisis básico del grafo
+        print(f"\n📐 PROPIEDADES DEL GRAFO:")
+        print(f"   • Es conexo: {nx.is_connected(red.G)}")
+        print(f"   • Número de componentes conexos: {nx.number_connected_components(red.G)}")
+        print(f"   • Diámetro: {nx.diameter(red.G) if nx.is_connected(red.G) else 'N/A'}")
+        print(f"   • Densidad: {nx.density(red.G):.4f}")
+        
+        # 2. Agrupar segmentos usando DFS
+        print("\n" + "=" * 70)
+        print("🔄 EJECUTANDO DFS PARA AGRUPAR SEGMENTOS")
+        print("=" * 70)
+        
+        # Opción 1: DFS simple (agrupa a lo largo del recorrido)
+        grupos = red.dfs_agrupar_segmentos(
+            longitud_objetivo_m=1000.0,  # 1km
+            tolerancia_km=0.1  # ±100m
+        )
+        
+        
+        # 3. Analizar resultados
+        red.analizar_resultados(output_dir)
+        
+        # 4. Exportar para GIS
+        print("\n" + "=" * 70)
+        print("🗺️  PREPARANDO DATOS PARA GIS")
+        print("=" * 70)
+        
+        # Crear GeoDataFrame para exportar a Shapefile/GeoJSON
+        import geopandas as gpd
+        from shapely.geometry import LineString
+        
+        # Datos de ejemplo de coordenadas (en realidad usarías tus coordenadas reales)
+        # Aquí asumimos que los nodos tienen coordenadas x,y
+        geometrias = []
+        atributos = []
+        
+        for u, v, data in red.G.edges(data=True):
+            # Obtener coordenadas de los nodos
+            u_pos = red.G.nodes[u]['pos']
+            v_pos = red.G.nodes[v]['pos']
+            
+            # Crear LineString
+            linea = LineString([u_pos, v_pos])
+            geometrias.append(linea)
+            
+            # Atributos
+            atributos.append({
+                'id_segmento': data['id_segmento'],
+                'grupo_id': red.segmentos_por_grupo.get(data['id_segmento'], -1),
+                'longitud_m': data['longitud_m'],
+                'tipo_conductor': data['tipo_conductor'],
+                'circuito': data['id_circuito'],
+                'nodo_inicio': u,
+                'nodo_fin': v
+            })
+        
+        gdf = gpd.GeoDataFrame(atributos, geometry=geometrias, crs="EPSG:4326")
+        geojson_path = os.path.join(output_dir, 'segmentos_con_grupos.geojson')
+        gpkg_path = os.path.join(output_dir, 'segmentos_con_grupos.gpkg')
+        gdf.to_file(geojson_path, driver='GeoJSON')
+        gdf.to_file(gpkg_path, driver='GPKG')
+        
+        print(f"✅ GeoJSON exportado: '{geojson_path}'")
+        print(f"✅ GeoPackage exportado: '{gpkg_path}'")
+        print(f"   {len(gdf)} segmentos con información de grupo")
+        
+        # Resumen final
+        print("\n" + "=" * 70)
+        print("✅ PROCESO COMPLETADO EXITOSAMENTE")
+        print("=" * 70)
+        print(f"""
     Resumen del proceso:
     1. 📊 Datos cargados: {len(df_segmentos)} segmentos, {len(df_nodos)} nodos
     2. 🔗 Grafo construido: {red.G.number_of_nodes()} nodos, {red.G.number_of_edges()} aristas
@@ -496,7 +510,33 @@ def main(input_dir, output_dir):
     • Importa el GeoJSON o GeoPackage a QGIS/ArcGIS
     • Usa el campo 'grupo_id' para simbología
     • Calcula estadísticas por grupo en tu GIS
-    """)
+        """)
+    
+        # Return results for library usage
+        return {
+            'success': True,
+            'grupos': red.grupos,
+            'red': red,
+            'stats': {
+                'num_grupos': len(red.grupos),
+                'num_segmentos': len(df_segmentos),
+                'num_nodos': len(df_nodos)
+            },
+            'files': {
+                'grupos': os.path.join(output_dir, 'grupos_1km.csv'),
+                'segmentos': os.path.join(output_dir, 'segmentos_con_grupo.csv'),
+                'geojson': geojson_path,
+                'gpkg': gpkg_path
+            }
+        }
+    except Exception as e:
+        print(f"\n❌ ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return {
+            'success': False,
+            'error': str(e)
+        }
 
 # ============================================================================
 # EJECUCIÓN
@@ -528,4 +568,10 @@ if __name__ == "__main__":
     print(f"   • Directorio de salida: {output_dir}")
     
     # Ejecutar proceso principal
-    main(input_dir, output_dir)
+    result = main(input_dir, output_dir)
+    
+    # Exit with appropriate code
+    if result and result.get('success'):
+        exit(0)
+    else:
+        exit(1)
