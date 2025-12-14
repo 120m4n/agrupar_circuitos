@@ -15,7 +15,6 @@ Es útil para la gestión de activos, planificación de mantenimiento y análisi
   - Agrupa segmentos contiguos hasta completar ~1 km (configurable).
   - Maneja tolerancias y ramificaciones.
 - **Análisis y Estadísticas**: Calcula métricas de los grupos formados (min, max, promedio, desviación estándar).
-- **Visualización**: Genera mapas de la red coloreados por grupos (`red_electrica_grupos.png`).
 - **Exportación GIS**: Genera archivos GeoJSON para integración con sistemas GIS (QGIS, ArcGIS).
 
 ## 🚀 Requisitos
@@ -24,13 +23,12 @@ Es útil para la gestión de activos, planificación de mantenimiento y análisi
 - Librerías:
   - `pandas`
   - `networkx`
-  - `matplotlib`
   - `numpy`
   - `geopandas` (para exportación GIS)
   - `shapely` (para geometrías GIS)
 
 ```bash
-pip install pandas networkx matplotlib numpy geopandas shapely
+pip install pandas networkx numpy geopandas shapely
 ```
 
 ## 🛠️ Uso
@@ -47,8 +45,7 @@ El script verificará si existen los archivos de entrada. Si no, creará datos d
 
 1.  `grupos_1km.csv`: Tabla resumen de los grupos formados.
 2.  `segmentos_con_grupo.csv`: Detalle de cada segmento con su ID de grupo asignado.
-3.  `red_electrica_grupos.png`: Visualización gráfica de la red.
-4.  `segmentos_con_grupos.geojson`: Archivo geoespacial para GIS.
+3.  `segmentos_con_grupos.geojson`: Archivo geoespacial para GIS.
 
 ## 🧩 Diagrama Funcional
 
@@ -92,9 +89,9 @@ flowchart TD
     T --> H
 
     Z --> AA[Analizar Estadísticas]
-    AA --> AB[Exportar CSV/GeoJSON]
-    AB --> AC[Visualizar Grafico]
-    AC --> AD[Fin]
+    AA --> AB[Exportar CSV/GeoJSON/Gpkg]
+    AB --> AD[Fin]
+
     
     style A fill:#f9f,stroke:#333
     style Z fill:#f9f,stroke:#333
@@ -105,11 +102,9 @@ flowchart TD
 
 ## 🔌 Exportación desde Oracle
 
-### ⚠️ Estado: DOCUMENTADO - NO IMPLEMENTADO
+Este proyecto incluye una funcionalidad de exportación de datos desde base de datos Oracle, que permite generar archivos CSV 100% compatibles con el formato esperado por `agrupar_circuitos.py`.
 
-Este proyecto incluye **documentación completa** para una funcionalidad de exportación de datos desde base de datos Oracle, que permite generar archivos CSV 100% compatibles con el formato esperado por `agrupar_circuitos.py`.
-
-### Características Documentadas
+### Características Implementadas
 
 - 📄 **Conexión a Oracle**: Mediante archivo de configuración `Connect.ini`
 - 📦 **Ejecución de Package**: Ejecuta el package Oracle `AGRUPAR_CIRCUITOS`
@@ -135,23 +130,23 @@ La documentación incluye:
 - Consideraciones de seguridad
 - Diagramas de flujo y secuencia
 
-### Requisitos para Implementación Futura
+### Requisitos
 
-Cuando se implemente, requerirá:
+Para usar la exportación desde Oracle, se requiere:
 - Oracle Instant Client
 - Python 3.8+
-- Librería `cx_Oracle`
+- Librería `oracledb` (anteriormente `cx_Oracle`)
 - Acceso a base de datos Oracle con tablas `HIT_NODE` y `HIT_LINE`
 - Package Oracle `AGRUPAR_CIRCUITOS`
 
-### Ejemplo de Uso Futuro
+### Ejemplo de Uso
 
 ```bash
 # Configurar conexión
 cp Connect.ini.example Connect.ini
 # Editar Connect.ini con credenciales
 
-# Generar CSV desde Oracle (una vez implementado)
+# Generar CSV desde Oracle
 python oracle_export.py
 
 # Usar con agrupar_circuitos.py
