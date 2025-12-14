@@ -449,7 +449,14 @@ def execute_package(
             error_msg = str(e.args[0]) if hasattr(e.args[0], '__str__') else str(e)
         else:
             error_msg = str(e)
-        raise PackageExecutionError(f"Error al ejecutar procedimiento {qualified_name}: {error_msg}")
+        
+        # Check for specific Oracle errors and provide concise messages
+        if "ORA-20002" in error_msg:
+            raise PackageExecutionError("Código de circuito no válido")
+        elif "ORA-06553" in error_msg or "PLS-306" in error_msg:
+            raise PackageExecutionError("Número o tipos de argumentos erróneos al llamar al procedimiento")
+        else:
+            raise PackageExecutionError(f"Error al ejecutar procedimiento {qualified_name}: {error_msg}")
 
 
 def check_package_exists(
@@ -1261,14 +1268,14 @@ Para más información, consultar oracle_export_documentation.md
         if result['success']:
             sys.exit(0)
         else:
-            logging.error("El proceso falló. Ver log para detalles.")
+            logging.error(f"El proceso falló: {', '.join(result['errors'])}")
             sys.exit(1)
             
     except KeyboardInterrupt:
         logging.info("\nProceso interrumpido por el usuario")
         sys.exit(130)
     except Exception as e:
-        logging.error(f"Error fatal: {e}", exc_info=True)
+        logging.error(f"Error fatal: {e}", exc_info=args.verbose)
         sys.exit(1)
 
 
