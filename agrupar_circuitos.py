@@ -14,10 +14,6 @@ from typing import List, Dict, Tuple, Set
 import argparse
 import os
 
-print("=" * 70)
-print("DFS + NETWORKX - AGRUPACIÓN DE SEGMENTOS DE ~1KM EN RED ELÉCTRICA")
-print("=" * 70)
-
 # ============================================================================
 # CONFIGURACIÓN DE PARÁMETROS
 # ============================================================================
@@ -40,72 +36,68 @@ def parse_arguments():
     )
     return parser.parse_args()
 
-# Parsear argumentos
-args = parse_arguments()
-INPUT_DIR = args.input_dir
-OUTPUT_DIR = args.output_dir
-
-# Crear directorio de salida si no existe
-os.makedirs(OUTPUT_DIR, exist_ok=True)
-
-print(f"\n⚙️  CONFIGURACIÓN:")
-print(f"   • Directorio de entrada: {INPUT_DIR}")
-print(f"   • Directorio de salida: {OUTPUT_DIR}")
-
-# ============================================================================
-# 1. CARGAR DATOS DESDE CSV
-# ============================================================================
-print("\n📥 PASO 1: CARGANDO DATOS DESDE ARCHIVOS CSV...")
-
-# Leer segmentos (aristas)
-try:
-    segmentos_path = os.path.join(INPUT_DIR, 'segmentos_circuito.csv')
-    df_segmentos = pd.read_csv(segmentos_path)
-    print(f"✅ Segmentos cargados: {len(df_segmentos)} registros")
-except FileNotFoundError:
-    print("⚠️  Creando datos de ejemplo...")
-    # Datos de ejemplo si no existe el archivo
-    df_segmentos = pd.DataFrame({
-        'id_segmento': range(11),
-        'id_circuito': ['MT-001'] * 11,
-        'nodo_inicio': [1001, 1002, 1003, 1004, 1005, 1002, 2001, 2002, 2003, 1004, 3001],
-        'nodo_fin': [1002, 1003, 1004, 1005, 1006, 2001, 2002, 2003, 2004, 3001, 3002],
-        'longitud_m': [523.5, 478.2, 612.8, 389.4, 734.1, 845.3, 567.9, 423.6, 321.8, 932.7, 587.4],
-        'tipo_conductor': ['AAC_150']*5 + ['AAC_95']*4 + ['AAC_150']*2,
-        'capacidad_amp': [250, 250, 250, 250, 250, 180, 180, 180, 180, 250, 250]
-    })
-
-# Leer nodos (vértices)
-try:
-    nodos_path = os.path.join(INPUT_DIR, 'nodos_circuito.csv')
-    df_nodos = pd.read_csv(nodos_path)
-    print(f"✅ Nodos cargados: {len(df_nodos)} registros")
-except FileNotFoundError:
-    print("⚠️  Creando datos de nodos de ejemplo...")
-    df_nodos = pd.DataFrame({
-        'id_nodo': [1001, 1002, 1003, 1004, 1005, 1006, 2001, 2002, 2003, 2004, 3001, 3002],
-        'nombre': ['Subestacion_Principal', 'Apoyo_MT_001', 'Apoyo_MT_002', 
-                  'Derivacion_001', 'Apoyo_MT_003', 'Transformador_001',
-                  'Apoyo_Rama_A_001', 'Apoyo_Rama_A_002', 'Apoyo_Rama_A_003',
-                  'Transformador_002', 'Apoyo_Rama_B_001', 'Transformador_003'],
-        'tipo': ['Subestacion', 'Apoyo', 'Apoyo', 'Derivacion', 'Apoyo', 'Transformador',
-                'Apoyo', 'Apoyo', 'Apoyo', 'Transformador', 'Apoyo', 'Transformador'],
-        'voltaje_kv': [34.5, 34.5, 34.5, 34.5, 34.5, 13.8, 34.5, 34.5, 34.5, 13.8, 34.5, 13.8],
-        'x': [-70.65, -70.651, -70.652, -70.653, -70.654, -70.655,
-              -70.6515, -70.652, -70.6525, -70.653, -70.6535, -70.654],
-        'y': [-33.45, -33.451, -33.452, -33.453, -33.454, -33.455,
-              -33.4515, -33.452, -33.4525, -33.453, -33.4535, -33.454]
-    })
-
-print("\n📊 RESUMEN INICIAL:")
-print(f"• Longitud total de circuitos: {df_segmentos['longitud_m'].sum()/1000:.2f} km")
-print(f"• Segmento más largo: {df_segmentos['longitud_m'].max():.1f} m")
-print(f"• Segmento más corto: {df_segmentos['longitud_m'].min():.1f} m")
+def cargar_datos_csv(input_dir):
+    """
+    Cargar datos desde archivos CSV o generar datos de ejemplo
+    
+    Args:
+        input_dir: Directorio de entrada para archivos CSV
+        
+    Returns:
+        tuple: (df_segmentos, df_nodos)
+    """
+    print("\n📥 PASO 1: CARGANDO DATOS DESDE ARCHIVOS CSV...")
+    
+    # Leer segmentos (aristas)
+    try:
+        segmentos_path = os.path.join(input_dir, 'segmentos_circuito.csv')
+        df_segmentos = pd.read_csv(segmentos_path)
+        print(f"✅ Segmentos cargados: {len(df_segmentos)} registros")
+    except FileNotFoundError:
+        print("⚠️  Creando datos de ejemplo...")
+        # Datos de ejemplo si no existe el archivo
+        df_segmentos = pd.DataFrame({
+            'id_segmento': range(11),
+            'id_circuito': ['MT-001'] * 11,
+            'nodo_inicio': [1001, 1002, 1003, 1004, 1005, 1002, 2001, 2002, 2003, 1004, 3001],
+            'nodo_fin': [1002, 1003, 1004, 1005, 1006, 2001, 2002, 2003, 2004, 3001, 3002],
+            'longitud_m': [523.5, 478.2, 612.8, 389.4, 734.1, 845.3, 567.9, 423.6, 321.8, 932.7, 587.4],
+            'tipo_conductor': ['AAC_150']*5 + ['AAC_95']*4 + ['AAC_150']*2,
+            'capacidad_amp': [250, 250, 250, 250, 250, 180, 180, 180, 180, 250, 250]
+        })
+    
+    # Leer nodos (vértices)
+    try:
+        nodos_path = os.path.join(input_dir, 'nodos_circuito.csv')
+        df_nodos = pd.read_csv(nodos_path)
+        print(f"✅ Nodos cargados: {len(df_nodos)} registros")
+    except FileNotFoundError:
+        print("⚠️  Creando datos de nodos de ejemplo...")
+        df_nodos = pd.DataFrame({
+            'id_nodo': [1001, 1002, 1003, 1004, 1005, 1006, 2001, 2002, 2003, 2004, 3001, 3002],
+            'nombre': ['Subestacion_Principal', 'Apoyo_MT_001', 'Apoyo_MT_002', 
+                      'Derivacion_001', 'Apoyo_MT_003', 'Transformador_001',
+                      'Apoyo_Rama_A_001', 'Apoyo_Rama_A_002', 'Apoyo_Rama_A_003',
+                      'Transformador_002', 'Apoyo_Rama_B_001', 'Transformador_003'],
+            'tipo': ['Subestacion', 'Apoyo', 'Apoyo', 'Derivacion', 'Apoyo', 'Transformador',
+                    'Apoyo', 'Apoyo', 'Apoyo', 'Transformador', 'Apoyo', 'Transformador'],
+            'voltaje_kv': [34.5, 34.5, 34.5, 34.5, 34.5, 13.8, 34.5, 34.5, 34.5, 13.8, 34.5, 13.8],
+            'x': [-70.65, -70.651, -70.652, -70.653, -70.654, -70.655,
+                  -70.6515, -70.652, -70.6525, -70.653, -70.6535, -70.654],
+            'y': [-33.45, -33.451, -33.452, -33.453, -33.454, -33.455,
+                  -33.4515, -33.452, -33.4525, -33.453, -33.4535, -33.454]
+        })
+    
+    print("\n📊 RESUMEN INICIAL:")
+    print(f"• Longitud total de circuitos: {df_segmentos['longitud_m'].sum()/1000:.2f} km")
+    print(f"• Segmento más largo: {df_segmentos['longitud_m'].max():.1f} m")
+    print(f"• Segmento más corto: {df_segmentos['longitud_m'].min():.1f} m")
+    
+    return df_segmentos, df_nodos
 
 # ============================================================================
 # 2. CONSTRUIR GRAFO CON NETWORKX
 # ============================================================================
-print("\n\n🔗 PASO 2: CONSTRUYENDO GRAFO CON NETWORKX...")
 
 class RedElectrica:
     """Clase para gestionar la red eléctrica usando NetworkX"""
@@ -396,13 +388,23 @@ class RedElectrica:
 # ============================================================================
 # 3. EJECUCIÓN PRINCIPAL
 # ============================================================================
-def main():
-    """Función principal de ejecución"""
+def main(input_dir, output_dir):
+    """
+    Función principal de ejecución
+    
+    Args:
+        input_dir: Directorio de entrada para archivos CSV
+        output_dir: Directorio de salida para archivos generados
+    """
+    
+    # Cargar datos
+    df_segmentos, df_nodos = cargar_datos_csv(input_dir)
     
     # Crear instancia de la red eléctrica
+    print("\n\n🔗 PASO 2: CONSTRUYENDO GRAFO CON NETWORKX...")
     red = RedElectrica()
     
-    # 1. Cargar datos
+    # 1. Cargar datos al grafo
     red.cargar_datos(df_segmentos, df_nodos)
     
     print("\n" + "=" * 70)
@@ -429,7 +431,7 @@ def main():
     
     
     # 3. Analizar resultados
-    red.analizar_resultados(OUTPUT_DIR)
+    red.analizar_resultados(output_dir)
     
     # 4. Exportar para GIS
     print("\n" + "=" * 70)
@@ -466,8 +468,8 @@ def main():
         })
     
     gdf = gpd.GeoDataFrame(atributos, geometry=geometrias, crs="EPSG:4326")
-    geojson_path = os.path.join(OUTPUT_DIR, 'segmentos_con_grupos.geojson')
-    gpkg_path = os.path.join(OUTPUT_DIR, 'segmentos_con_grupos.gpkg')
+    geojson_path = os.path.join(output_dir, 'segmentos_con_grupos.geojson')
+    gpkg_path = os.path.join(output_dir, 'segmentos_con_grupos.gpkg')
     gdf.to_file(geojson_path, driver='GeoJSON')
     gdf.to_file(gpkg_path, driver='GPKG')
     
@@ -484,7 +486,7 @@ def main():
     1. 📊 Datos cargados: {len(df_segmentos)} segmentos, {len(df_nodos)} nodos
     2. 🔗 Grafo construido: {red.G.number_of_nodes()} nodos, {red.G.number_of_edges()} aristas
     3. 🎯 Segmentos agrupados: {len(red.grupos)} grupos de ~1km
-    4. 💾 Archivos generados en {OUTPUT_DIR}:
+    4. 💾 Archivos generados en {output_dir}:
        • grupos_1km.csv
        • segmentos_con_grupo.csv  
        • segmentos_con_grupos.geojson
@@ -500,9 +502,30 @@ def main():
 # EJECUCIÓN
 # ============================================================================
 if __name__ == "__main__":
-    main()
+    print("=" * 70)
+    print("DFS + NETWORKX - AGRUPACIÓN DE SEGMENTOS DE ~1KM EN RED ELÉCTRICA")
+    print("=" * 70)
     
-    # Para análisis avanzado, descomentar:
-    # red = RedElectrica()
-    # red.cargar_datos(df_segmentos, df_nodos)
-    # analisis_avanzado(red)
+    # Parsear argumentos
+    args = parse_arguments()
+    input_dir = args.input_dir
+    output_dir = args.output_dir
+    
+    # Validar y crear directorios
+    if not os.path.exists(input_dir):
+        print(f"⚠️  El directorio de entrada '{input_dir}' no existe. Será creado.")
+        os.makedirs(input_dir, exist_ok=True)
+    
+    if not os.access(input_dir, os.R_OK):
+        print(f"❌ Error: El directorio de entrada '{input_dir}' no es legible.")
+        exit(1)
+    
+    # Crear directorio de salida si no existe
+    os.makedirs(output_dir, exist_ok=True)
+    
+    print(f"\n⚙️  CONFIGURACIÓN:")
+    print(f"   • Directorio de entrada: {input_dir}")
+    print(f"   • Directorio de salida: {output_dir}")
+    
+    # Ejecutar proceso principal
+    main(input_dir, output_dir)
