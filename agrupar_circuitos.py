@@ -11,10 +11,46 @@ import networkx as nx
 from collections import defaultdict, deque
 import numpy as np
 from typing import List, Dict, Tuple, Set
+import argparse
+import os
 
 print("=" * 70)
 print("DFS + NETWORKX - AGRUPACIÓN DE SEGMENTOS DE ~1KM EN RED ELÉCTRICA")
 print("=" * 70)
+
+# ============================================================================
+# CONFIGURACIÓN DE PARÁMETROS
+# ============================================================================
+def parse_arguments():
+    """Parse command line arguments"""
+    parser = argparse.ArgumentParser(
+        description='Agrupar segmentos de red eléctrica en tramos de ~1km usando DFS'
+    )
+    parser.add_argument(
+        '--input-dir',
+        type=str,
+        default='./data',
+        help='Directorio de entrada para archivos CSV (default: ./data)'
+    )
+    parser.add_argument(
+        '--output-dir',
+        type=str,
+        default='./data',
+        help='Directorio de salida para archivos generados (default: ./data)'
+    )
+    return parser.parse_args()
+
+# Parsear argumentos
+args = parse_arguments()
+INPUT_DIR = args.input_dir
+OUTPUT_DIR = args.output_dir
+
+# Crear directorio de salida si no existe
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+print(f"\n⚙️  CONFIGURACIÓN:")
+print(f"   • Directorio de entrada: {INPUT_DIR}")
+print(f"   • Directorio de salida: {OUTPUT_DIR}")
 
 # ============================================================================
 # 1. CARGAR DATOS DESDE CSV
@@ -23,7 +59,8 @@ print("\n📥 PASO 1: CARGANDO DATOS DESDE ARCHIVOS CSV...")
 
 # Leer segmentos (aristas)
 try:
-    df_segmentos = pd.read_csv('segmentos_circuito.csv')
+    segmentos_path = os.path.join(INPUT_DIR, 'segmentos_circuito.csv')
+    df_segmentos = pd.read_csv(segmentos_path)
     print(f"✅ Segmentos cargados: {len(df_segmentos)} registros")
 except FileNotFoundError:
     print("⚠️  Creando datos de ejemplo...")
@@ -40,7 +77,8 @@ except FileNotFoundError:
 
 # Leer nodos (vértices)
 try:
-    df_nodos = pd.read_csv('nodos_circuito.csv')
+    nodos_path = os.path.join(INPUT_DIR, 'nodos_circuito.csv')
+    df_nodos = pd.read_csv(nodos_path)
     print(f"✅ Nodos cargados: {len(df_nodos)} registros")
 except FileNotFoundError:
     print("⚠️  Creando datos de nodos de ejemplo...")
@@ -282,7 +320,7 @@ class RedElectrica:
         
         return grupos
     
-    def analizar_resultados(self):
+    def analizar_resultados(self, output_dir):
         """Analizar y mostrar resultados de la agrupación"""
         if not self.grupos:
             print("⚠️  No hay grupos para analizar. Ejecuta dfs_agrupar_segmentos() primero.")
@@ -312,9 +350,9 @@ class RedElectrica:
                   f"{info['longitud_total_m']/1000:<12.2f}")
         
         # Exportar resultados a CSV
-        self.exportar_resultados_csv()
+        self.exportar_resultados_csv(output_dir)
     
-    def exportar_resultados_csv(self):
+    def exportar_resultados_csv(self, output_dir):
         """Exportar resultados a archivos CSV"""
         # 1. Grupos a CSV
         datos_grupos = []
@@ -327,7 +365,8 @@ class RedElectrica:
             })
         
         df_grupos = pd.DataFrame(datos_grupos)
-        df_grupos.to_csv('grupos_1km.csv', index=False)
+        grupos_path = os.path.join(output_dir, 'grupos_1km.csv')
+        df_grupos.to_csv(grupos_path, index=False)
         
         # 2. Segmentos con su grupo asignado
         datos_segmentos = []
@@ -347,11 +386,12 @@ class RedElectrica:
                     break
         
         df_segmentos_grupo = pd.DataFrame(datos_segmentos)
-        df_segmentos_grupo.to_csv('segmentos_con_grupo.csv', index=False)
+        segmentos_path = os.path.join(output_dir, 'segmentos_con_grupo.csv')
+        df_segmentos_grupo.to_csv(segmentos_path, index=False)
         
         print(f"\n💾 RESULTADOS EXPORTADOS:")
-        print(f"   • grupos_1km.csv: {len(df_grupos)} grupos")
-        print(f"   • segmentos_con_grupo.csv: {len(df_segmentos_grupo)} segmentos")
+        print(f"   • {grupos_path}: {len(df_grupos)} grupos")
+        print(f"   • {segmentos_path}: {len(df_segmentos_grupo)} segmentos")
 
 # ============================================================================
 # 3. EJECUCIÓN PRINCIPAL
@@ -389,7 +429,7 @@ def main():
     
     
     # 3. Analizar resultados
-    red.analizar_resultados()
+    red.analizar_resultados(OUTPUT_DIR)
     
     # 4. Exportar para GIS
     print("\n" + "=" * 70)
@@ -426,11 +466,13 @@ def main():
         })
     
     gdf = gpd.GeoDataFrame(atributos, geometry=geometrias, crs="EPSG:4326")
-    gdf.to_file('segmentos_con_grupos.geojson', driver='GeoJSON')
-    gdf.to_file('segmentos_con_grupos.gpkg', driver='GPKG')
+    geojson_path = os.path.join(OUTPUT_DIR, 'segmentos_con_grupos.geojson')
+    gpkg_path = os.path.join(OUTPUT_DIR, 'segmentos_con_grupos.gpkg')
+    gdf.to_file(geojson_path, driver='GeoJSON')
+    gdf.to_file(gpkg_path, driver='GPKG')
     
-    print(f"✅ GeoJSON exportado: 'segmentos_con_grupos.geojson'")
-    print(f"✅ GeoPackage exportado: 'segmentos_con_grupos.gpkg'")
+    print(f"✅ GeoJSON exportado: '{geojson_path}'")
+    print(f"✅ GeoPackage exportado: '{gpkg_path}'")
     print(f"   {len(gdf)} segmentos con información de grupo")
     
     # Resumen final
@@ -442,7 +484,7 @@ def main():
     1. 📊 Datos cargados: {len(df_segmentos)} segmentos, {len(df_nodos)} nodos
     2. 🔗 Grafo construido: {red.G.number_of_nodes()} nodos, {red.G.number_of_edges()} aristas
     3. 🎯 Segmentos agrupados: {len(red.grupos)} grupos de ~1km
-    4. 💾 Archivos generados:
+    4. 💾 Archivos generados en {OUTPUT_DIR}:
        • grupos_1km.csv
        • segmentos_con_grupo.csv  
        • segmentos_con_grupos.geojson

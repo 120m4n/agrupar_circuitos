@@ -33,9 +33,16 @@ segmentos_con_grupo.csv
 
 # GIS output files
 *.geojson
+*.gpkg
 *.png
 red_electrica_grupos.png
 segmentos_con_grupos.geojson
+
+# Data directory output files
+data/*.csv
+data/*.geojson
+data/*.gpkg
+data/*.png
 
 # Jupyter Notebooks
 .ipynb_checkpoints/
