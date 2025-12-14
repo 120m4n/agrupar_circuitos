@@ -80,6 +80,7 @@ class CSVWriteError(OracleExportError):
 
 def export_from_oracle(
     config_file: str = "Connect.ini",
+    circuito: str = None,
     return_dataframes: bool = False
 ) -> Union[Dict[str, str], Tuple[pd.DataFrame, pd.DataFrame]]:
     """
@@ -87,6 +88,7 @@ def export_from_oracle(
     
     Args:
         config_file: Ruta al archivo de configuración
+        circuito: Código del circuito a procesar (requerido)
         return_dataframes: Si True, retorna DataFrames en lugar de rutas
         
     Returns:
@@ -97,16 +99,19 @@ def export_from_oracle(
             
     Example:
         # Generar archivos CSV
-        files = export_from_oracle('Connect.ini')
+        files = export_from_oracle('Connect.ini', '12 0m4n')
         print(f"Archivos generados: {files}")
         
         # Obtener DataFrames directamente
         df_nodos, df_segmentos = export_from_oracle(
-            'Connect.ini', 
+            'Connect.ini', '12 0m4n', 
             return_dataframes=True
         )
     """
-    result = oracle_to_csv_pipeline(config_file)
+    if not circuito:
+        raise ValueError("El parámetro 'circuito' es requerido")
+    
+    result = oracle_to_csv_pipeline(config_file, circuito)
     
     if not result['success']:
         raise OracleExportError(f"Error en pipeline: {result['errors']}")
@@ -388,6 +393,7 @@ def oracle_connection(config: Dict[str, Any]) -> Generator[OracleConnection, Non
 def execute_package(
     conn: OracleConnection,
     package_name: str,
+    circuito: str,
     schema: str = None
 ) -> bool:
     """
@@ -396,6 +402,7 @@ def execute_package(
     Args:
         conn: Conexión activa a Oracle
         package_name: Nombre del package (ej. "AGRUPAR_CIRCUITOS")
+        circuito: Código del circuito a procesar
         schema: Esquema donde está el package (opcional)
         
     Returns:
@@ -407,7 +414,7 @@ def execute_package(
     Notas:
         - El procedimiento debe existir en la base de datos
         - Debe tener los permisos necesarios para ejecutarlo
-        - Se ejecuta como CALL schema.package.procedure()
+        - Se ejecuta como CALL schema.package.procedure(circuito)
     """
     try:
         cursor = conn.cursor()
@@ -428,8 +435,8 @@ def execute_package(
         # Using f-string is safe here because qualified_name has been sanitized
         # sql = f"CALL {qualified_name}();"
         
-        logging.info(f"Ejecutando procedimiento: {qualified_name}")
-        cursor.callproc(qualified_name)
+        logging.info(f"Ejecutando procedimiento: {qualified_name}('{circuito}')")
+        cursor.callproc(qualified_name, [circuito])
         conn.commit()
         cursor.close()
         
@@ -982,7 +989,7 @@ def setup_logging(log_level: str = "INFO", log_file: str = "oracle_export.log"):
 # PIPELINE PRINCIPAL
 # ============================================================================
 
-def oracle_to_csv_pipeline(config_file: str = "Connect.ini") -> Dict[str, Any]:
+def oracle_to_csv_pipeline(config_file: str = "Connect.ini", circuito: str = None) -> Dict[str, Any]:
     """
     Pipeline completo de extracción Oracle → CSV.
     
@@ -990,6 +997,7 @@ def oracle_to_csv_pipeline(config_file: str = "Connect.ini") -> Dict[str, Any]:
     
     Args:
         config_file: Ruta al archivo de configuración
+        circuito: Código del circuito a procesar
         
     Returns:
         Diccionario con resultados:
@@ -1007,7 +1015,7 @@ def oracle_to_csv_pipeline(config_file: str = "Connect.ini") -> Dict[str, Any]:
     Flujo:
         1. Leer configuración
         2. Conectar a Oracle
-        3. Ejecutar procedimiento AGRUPAR_CIRCUITOS.PROCESAR
+        3. Ejecutar procedimiento AGRUPAR_CIRCUITOS.PROCESAR(circuito)
         4. Extraer datos de HIT_NODE y HIT_LINE
         5. Transformar y validar datos
         6. Generar archivos CSV
@@ -1052,6 +1060,7 @@ def oracle_to_csv_pipeline(config_file: str = "Connect.ini") -> Dict[str, Any]:
                 execute_package(
                     conn, 
                     db_config['package_name'], 
+                    circuito,
                     db_config.get('schema')
                 )
             
@@ -1118,6 +1127,7 @@ def main():
     
     Argumentos CLI:
         --config: Ruta al archivo Connect.ini (default: "./Connect.ini")
+        --circuito: Código del circuito a procesar (requerido)
         --output-dir: Directorio para archivos CSV (default: "./")
         --verbose: Modo verboso de logging
         --dry-run: Simular ejecución sin escribir archivos
@@ -1128,10 +1138,10 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Ejemplos de uso:
-  python oracle_export.py
-  python oracle_export.py --config /ruta/a/config.ini
-  python oracle_export.py --config Connect.ini --verbose
-  python oracle_export.py --output-dir ./data --skip-procedure
+  python oracle_export.py --circuito "12 0m4n"
+  python oracle_export.py --config /ruta/a/config.ini --circuito "15 501"
+  python oracle_export.py --config Connect.ini --circuito "12 0m4n" --verbose
+  python oracle_export.py --output-dir ./data --circuito "12 0m4n" --skip-procedure
 
 Para más información, consultar oracle_export_documentation.md
         """
@@ -1142,6 +1152,13 @@ Para más información, consultar oracle_export_documentation.md
         type=str,
         default='Connect.ini',
         help='Ruta al archivo de configuración (default: Connect.ini)'
+    )
+    
+    parser.add_argument(
+        '--circuito',
+        type=str,
+        required=True,
+        help='Código del circuito a procesar (requerido)'
     )
     
     parser.add_argument(
@@ -1230,7 +1247,7 @@ Para más información, consultar oracle_export_documentation.md
                 config_file = args.config
             
             # Run pipeline
-            result = oracle_to_csv_pipeline(config_file)
+            result = oracle_to_csv_pipeline(config_file, args.circuito)
         
         finally:
             # Cleanup temp config in finally block to ensure cleanup even on error
