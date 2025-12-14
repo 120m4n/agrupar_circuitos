@@ -315,7 +315,7 @@ def create_connection(config: Dict[str, Any]) -> OracleConnection:
         else:
             raise ConfigurationError("No se proporcionó password ni wallet_location")
         
-        logging.info(f"✓ Conexión establecida a {oracle_config['host']}:{oracle_config['port']}/{oracle_config['service_name']}")
+        logging.info(f"[OK] Conexión establecida a {oracle_config['host']}:{oracle_config['port']}/{oracle_config['service_name']}")
         return conn
         
     except cx_Oracle.Error as e:
@@ -357,7 +357,7 @@ def close_connection(conn: OracleConnection) -> None:
     try:
         if conn:
             conn.close()
-            logging.info("✓ Conexión cerrada")
+            logging.info("[OK] Conexión cerrada")
     except cx_Oracle.Error as e:
         logging.warning(f"Error al cerrar conexión: {e}")
 
@@ -426,14 +426,14 @@ def execute_package(
         
         # Execute procedure using CALL syntax
         # Using f-string is safe here because qualified_name has been sanitized
-        sql = f"CALL {qualified_name}();"
+        # sql = f"CALL {qualified_name}();"
         
         logging.info(f"Ejecutando procedimiento: {qualified_name}")
-        cursor.execute(sql)
+        cursor.callproc(qualified_name)
         conn.commit()
         cursor.close()
         
-        logging.info(f"✓ Procedimiento ejecutado exitosamente")
+        logging.info(f"[OK] Procedimiento ejecutado exitosamente")
         return True
         
     except cx_Oracle.Error as e:
@@ -532,20 +532,22 @@ def extract_nodes(
         # These mappings should be adjusted based on actual Oracle schema
         # Using f-string is safe here because qualified_name has been sanitized
         sql = f"""
-            SELECT 
-                node_id AS id_nodo,
-                node_name AS nombre,
-                node_type AS tipo,
-                voltage_kv AS voltaje_kv,
-                coord_x AS x,
-                coord_y AS y
-            FROM {qualified_name}
-            ORDER BY node_id
+            SELECT
+                hn.ABB_INT_ID AS id_nodo,
+                hn.NNAME AS nombre,
+                hn.tipo AS tipo,
+                hn.TENSION voltaje_kv,
+                hn.LON x,
+                hn.LAT y
+            FROM {qualified_name} hn
+            ORDER BY hn.ABB_INT_ID
         """
         
         logging.info(f"Extrayendo datos de tabla {qualified_name}...")
         df = pd.read_sql(sql, conn)
-        logging.info(f"✓ {len(df)} nodos extraídos")
+        # Ensure column names are lowercase for compatibility with agrupar_circuitos.py
+        df.columns = df.columns.str.lower()
+        logging.info(f"[OK] {len(df)} nodos extraídos")
         
         return df
         
@@ -589,21 +591,25 @@ def extract_lines(
         # These mappings should be adjusted based on actual Oracle schema
         # Using f-string is safe here because qualified_name has been sanitized
         sql = f"""
-            SELECT 
-                line_id AS id_segmento,
-                circuit_id AS id_circuito,
-                from_node_id AS nodo_inicio,
-                to_node_id AS nodo_fin,
-                length_m AS longitud_m,
-                conductor_type AS tipo_conductor,
-                ampacity AS capacidad_amp
-            FROM {qualified_name}
-            ORDER BY line_id
+            SELECT
+                hl.ABB_INT_ID AS id_segmento,
+                '12 0m4n' AS id_circuito,
+                hl.NO_KEY_1 AS nodo_inicio,
+                hl.NO_KEY_2 AS nodo_fin,
+                hl."LENGTH" AS longitud_m,
+                hl.TIPO_CONDUCTOR AS tipo_conductor,
+                hl.CAPACIDAD_AMP AS capacidad_amp
+            FROM {qualified_name} hl
+            JOIN HIT_NODE hn ON hn.ABB_INT_ID = hl.NO_KEY_1
+            JOIN HIT_NODE hn2 ON hn2.ABB_INT_ID = hl.NO_KEY_2 
+            ORDER BY hl.ABB_INT_ID
         """
         
         logging.info(f"Extrayendo datos de tabla {qualified_name}...")
         df = pd.read_sql(sql, conn)
-        logging.info(f"✓ {len(df)} segmentos extraídos")
+        # Ensure column names are lowercase for compatibility with agrupar_circuitos.py
+        df.columns = df.columns.str.lower()
+        logging.info(f"[OK] {len(df)} segmentos extraídos")
         
         return df
         
@@ -686,7 +692,7 @@ def transform_nodes(df_raw: pd.DataFrame) -> pd.DataFrame:
     if (df['voltaje_kv'] <= 0).any():
         raise DataValidationError("Hay valores no positivos en voltaje_kv")
     
-    logging.info("✓ Nodos transformados y validados")
+    logging.info("[OK] Nodos transformados y validados")
     return df
 
 
@@ -755,7 +761,7 @@ def transform_lines(df_raw: pd.DataFrame) -> pd.DataFrame:
     if (df['longitud_m'] > 10000).any():
         logging.warning("Hay segmentos con longitud > 10 km")
     
-    logging.info("✓ Líneas transformadas y validadas")
+    logging.info("[OK] Líneas transformadas y validadas")
     return df
 
 
@@ -811,7 +817,7 @@ def validate_data_integrity(
             logging.error(f"Error de validación: {error}")
         return False, errors
     else:
-        logging.info("✓ Validación de integridad exitosa")
+        logging.info("[OK] Validación de integridad exitosa")
         return True, []
 
 
@@ -850,7 +856,7 @@ def write_csv(
         # Write CSV
         df.to_csv(filepath, index=False, encoding=encoding)
         
-        logging.info(f"✓ {filename} generado ({len(df)} registros)")
+        logging.info(f"[OK] {filename} generado ({len(df)} registros)")
         return filepath
         
     except Exception as e:
@@ -1024,7 +1030,7 @@ def oracle_to_csv_pipeline(config_file: str = "Connect.ini") -> Dict[str, Any]:
         logging.info(f"Leyendo configuración desde {config_file}")
         config = read_config(config_file)
         validate_config(config)
-        logging.info("✓ Configuración validada")
+        logging.info("[OK] Configuración validada")
         
         # Setup logging from config
         if 'LOGGING' in config:
