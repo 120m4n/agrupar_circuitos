@@ -1118,8 +1118,7 @@ def oracle_to_csv_pipeline(config_file: str = "Connect.ini", circuito: str = Non
         logging.info("=" * 70)
         
     except Exception as e:
-        result['errors'].append(str(e))
-        logging.error(f"Error en pipeline: {e}", exc_info=True)
+        raise OracleExportError(str(e))
     
     return result
 
@@ -1225,58 +1224,53 @@ Para más información, consultar oracle_export_documentation.md
         
         # Read and modify config if needed
         temp_config_file = None
-        try:
-            if args.output_dir or args.skip_procedure:
-                config = read_config(args.config)
-                
-                if args.output_dir:
-                    if 'OUTPUT' not in config:
-                        config['OUTPUT'] = {}
-                    config['OUTPUT']['output_dir'] = args.output_dir
-                
-                if args.skip_procedure:
-                    if 'DATABASE' in config:
-                        config['DATABASE']['package_name'] = ''
-                
-                # Write temporary config
-                with tempfile.NamedTemporaryFile(mode='w', suffix='.ini', delete=False) as f:
-                    temp_config_file = f.name
-                    config_parser = configparser.ConfigParser()
-                    for section, values in config.items():
-                        config_parser[section] = {}
-                        # Convert all values to strings for ConfigParser
-                        for key, value in values.items():
-                            config_parser[section][key] = str(value)
-                    config_parser.write(f)
-                
-                config_file = temp_config_file
-            else:
-                config_file = args.config
+
+        if args.output_dir or args.skip_procedure:
+            config = read_config(args.config)
             
-            # Run pipeline
-            result = oracle_to_csv_pipeline(config_file, args.circuito)
-        
-        finally:
-            # Cleanup temp config in finally block to ensure cleanup even on error
-            if temp_config_file and os.path.exists(temp_config_file):
-                try:
-                    os.unlink(temp_config_file)
-                except Exception as e:
-                    logging.warning(f"No se pudo eliminar archivo temporal: {e}")
-        
-        # Exit with appropriate code
-        if result['success']:
-            sys.exit(0)
+            if args.output_dir:
+                if 'OUTPUT' not in config:
+                    config['OUTPUT'] = {}
+                config['OUTPUT']['output_dir'] = args.output_dir
+            
+            if args.skip_procedure:
+                if 'DATABASE' in config:
+                    config['DATABASE']['package_name'] = ''
+            
+            # Write temporary config
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.ini', delete=False) as f:
+                temp_config_file = f.name
+                config_parser = configparser.ConfigParser()
+                for section, values in config.items():
+                    config_parser[section] = {}
+                    # Convert all values to strings for ConfigParser
+                    for key, value in values.items():
+                        config_parser[section][key] = str(value)
+                config_parser.write(f)
+            
+            config_file = temp_config_file
         else:
-            logging.error(f"El proceso falló: {', '.join(result['errors'])}")
-            sys.exit(1)
+            config_file = args.config
+        
+        # Run pipeline
+        result = oracle_to_csv_pipeline(config_file, args.circuito)
+        
+        # Success
+        sys.exit(0)
             
     except KeyboardInterrupt:
         logging.info("\nProceso interrumpido por el usuario")
         sys.exit(130)
     except Exception as e:
-        logging.error(f"Error fatal: {e}", exc_info=args.verbose)
+        logging.error(f"El proceso falló: {e}", exc_info=args.verbose)
         sys.exit(1)
+    finally:
+        # Cleanup temp config in finally block to ensure cleanup even on error
+        if 'temp_config_file' in locals() and temp_config_file and os.path.exists(temp_config_file):
+            try:
+                os.unlink(temp_config_file)
+            except Exception as e:
+                logging.warning(f"No se pudo eliminar archivo temporal: {e}")
 
 
 if __name__ == "__main__":
