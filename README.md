@@ -35,20 +35,56 @@ pip install pandas networkx matplotlib numpy geopandas shapely
 
 ## 🛠️ Uso
 
-Ejecuta el script principal:
+### Uso Básico
+
+Ejecuta el script principal con los parámetros por defecto:
 
 ```bash
 python agrupar_circuitos.py
 ```
 
-El script verificará si existen los archivos de entrada. Si no, creará datos de ejemplo automáticamente.
+Por defecto, el script busca los archivos de entrada en `./data` y genera los archivos de salida en `./data`.
+
+### Parámetros de Configuración
+
+El script acepta los siguientes parámetros de línea de comandos:
+
+- `--input-dir`: Directorio de entrada para archivos CSV (default: `./data`)
+- `--output-dir`: Directorio de salida para archivos generados (default: `./data`)
+
+### Ejemplos de Uso
+
+```bash
+# Usar directorios por defecto (./data)
+python agrupar_circuitos.py
+
+# Especificar directorio de entrada personalizado
+python agrupar_circuitos.py --input-dir /ruta/a/datos/entrada
+
+# Especificar directorios de entrada y salida personalizados
+python agrupar_circuitos.py --input-dir /ruta/entrada --output-dir /ruta/salida
+
+# Ver ayuda
+python agrupar_circuitos.py --help
+```
+
+### Archivos de Entrada
+
+El script requiere los siguientes archivos CSV en el directorio de entrada:
+
+1. `segmentos_circuito.csv`: Contiene información de los segmentos de la red eléctrica
+2. `nodos_circuito.csv`: Contiene información de los nodos de la red eléctrica
+
+Si los archivos no existen, el script creará datos de ejemplo automáticamente.
 
 ### Salidas Generadas
 
-1.  `grupos_1km.csv`: Tabla resumen de los grupos formados.
-2.  `segmentos_con_grupo.csv`: Detalle de cada segmento con su ID de grupo asignado.
-3.  `red_electrica_grupos.png`: Visualización gráfica de la red.
-4.  `segmentos_con_grupos.geojson`: Archivo geoespacial para GIS.
+Todos los archivos de salida se generan en el directorio especificado por `--output-dir`:
+
+1. `grupos_1km.csv`: Tabla resumen de los grupos formados.
+2. `segmentos_con_grupo.csv`: Detalle de cada segmento con su ID de grupo asignado.
+3. `segmentos_con_grupos.geojson`: Archivo geoespacial en formato GeoJSON para GIS.
+4. `segmentos_con_grupos.gpkg`: Archivo geoespacial en formato GeoPackage para GIS.
 
 ## 🧩 Diagrama Funcional
 
@@ -152,8 +188,9 @@ cp Connect.ini.example Connect.ini
 # Editar Connect.ini con credenciales
 
 # Generar CSV desde Oracle (una vez implementado)
-python oracle_export.py
+# Los archivos se guardarán en el directorio especificado
+python oracle_export.py --output-dir ./data
 
 # Usar con agrupar_circuitos.py
-python agrupar_circuitos.py
+python agrupar_circuitos.py --input-dir ./data --output-dir ./data
 ```
