@@ -17,6 +17,14 @@ Fecha: 2025-12-14
 Versión: 1.0
 """
 
+# Prevent this module from being imported
+if __name__ != "__main__":
+    raise RuntimeError(
+        "main.py está diseñado para ejecutarse ÚNICAMENTE en modo standalone.\n"
+        "No debe ser importado como librería.\n"
+        "Para uso programático, importar oracle_export.py y agrupar_circuitos.py directamente."
+    )
+
 import sys
 import os
 import argparse
@@ -113,15 +121,35 @@ def main_pipeline(
             print("=" * 70)
             
             try:
-                # Modificar temporalmente la configuración de salida
+                import tempfile
+                import configparser
+                
+                # Leer configuración original
                 config = oracle_export.read_config(config_file)
+                
+                # Modificar la configuración de salida
                 config['OUTPUT']['output_dir'] = output_dir
                 config['OUTPUT']['node_csv'] = 'nodos_circuito.csv'
                 config['OUTPUT']['segment_csv'] = 'segmentos_circuito.csv'
                 
-                # Ejecutar exportación
-                export_result = oracle_export.oracle_to_csv_pipeline(config_file, circuito)
-                result['oracle_export'] = export_result
+                # Crear archivo de configuración temporal
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.ini', delete=False) as f:
+                    temp_config_file = f.name
+                    config_parser = configparser.ConfigParser()
+                    for section, values in config.items():
+                        config_parser[section] = {}
+                        for key, value in values.items():
+                            config_parser[section][key] = str(value)
+                    config_parser.write(f)
+                
+                try:
+                    # Ejecutar exportación con config temporal
+                    export_result = oracle_export.oracle_to_csv_pipeline(temp_config_file, circuito)
+                    result['oracle_export'] = export_result
+                finally:
+                    # Limpiar archivo temporal
+                    if os.path.exists(temp_config_file):
+                        os.unlink(temp_config_file)
                 
                 if not export_result['success']:
                     raise Exception(f"Error en exportación Oracle: {export_result['errors']}")
@@ -209,13 +237,6 @@ def main():
     Este script NO debe ser importado como librería.
     Usar oracle_export.py y agrupar_circuitos.py directamente como librerías.
     """
-    # Detectar si el script está siendo importado
-    if __name__ != "__main__":
-        raise RuntimeError(
-            "main.py está diseñado para ejecutarse ÚNICAMENTE en modo standalone.\n"
-            "No debe ser importado como librería.\n"
-            "Para uso programático, importar oracle_export.py y agrupar_circuitos.py directamente."
-        )
     
     # Configurar argumentos CLI
     parser = argparse.ArgumentParser(

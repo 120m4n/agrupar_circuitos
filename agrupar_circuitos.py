@@ -571,7 +571,8 @@ if __name__ == "__main__":
     result = main(input_dir, output_dir)
     
     # Exit with appropriate code
+    import sys
     if result and result.get('success'):
-        exit(0)
+        sys.exit(0)
     else:
-        exit(1)
+        sys.exit(1)
