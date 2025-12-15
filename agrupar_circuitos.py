@@ -111,7 +111,7 @@ class RedElectrica:
     
     def __init__(self):
         self.G = nx.Graph()
-        self.segmentos_por_grupo = defaultdict(list)
+        self.segmentos_por_grupo = {}  # Maps segmento_id -> grupo_id
         self.grupos = {}
         
     def cargar_datos(self, df_segmentos: pd.DataFrame, df_nodos: pd.DataFrame):
@@ -162,7 +162,7 @@ class RedElectrica:
         
         Args:
             longitud_objetivo_m: Longitud objetivo en metros (default: 1000m = 1km)
-            tolerancia_km: Tolerancia en kilómetros (default: ±200m)
+            tolerancia_km: Tolerancia como fracción (default: 0.2 = ±20% = ±200m para 1000m)
         """
         
         nodo_inicio = self.encontrar_subestacion_principal()
@@ -264,7 +264,7 @@ class RedElectrica:
         
         Args:
             longitud_objetivo_m: Longitud objetivo en metros (default: 1000m = 1km)
-            tolerancia_km: Tolerancia en kilómetros (default: ±200m)
+            tolerancia_km: Tolerancia como fracción (default: 0.2 = ±20% = ±200m para 1000m)
             
         Returns:
             Dict con los grupos formados, incluyendo información de la rama
@@ -307,7 +307,7 @@ class RedElectrica:
         
         grupo_id = 1
         self.grupos = {}
-        self.segmentos_por_grupo = defaultdict(int)
+        self.segmentos_por_grupo = {}  # Reset mapping
         
         for rama_id, rama in enumerate(ramas, 1):
             print(f"\n   🌿 Procesando Rama {rama_id}:")
@@ -636,6 +636,11 @@ def _comparar_algoritmos(grupos_lineal: Dict, grupos_ramas: Dict, output_dir: st
     longitudes_lineal = [g['longitud_total_m'] for g in grupos_lineal.values()]
     longitudes_ramas = [g['longitud_total_m'] for g in grupos_ramas.values()]
     
+    # Validar que haya datos para comparar
+    if not longitudes_lineal or not longitudes_ramas:
+        print("\n⚠️  No hay suficientes datos para comparar algoritmos")
+        return
+    
     print("\n📈 COMPARACIÓN DE ESTADÍSTICAS:")
     print("-" * 70)
     print(f"{'Métrica':<30} {'Lineal':<20} {'Por Ramas':<20}")
@@ -787,18 +792,15 @@ def main(input_dir='./data', output_dir='./data', algoritmo='lineal'):
                 tolerancia_km=0.2
             )
             
-            # Guardar resultados del algoritmo lineal
-            red_lineal = red  # Guardar referencia
-            
             # Crear nueva instancia para algoritmo por ramas
-            red = RedElectrica()
-            red.cargar_datos(df_segmentos, df_nodos)
+            red_por_ramas = RedElectrica()
+            red_por_ramas.cargar_datos(df_segmentos, df_nodos)
             
             # Algoritmo 2: Por ramas
             print("\n" + "=" * 70)
             print("2️⃣  ALGORITMO POR RAMAS")
             print("=" * 70)
-            grupos_ramas = red.dfs_por_ramas(
+            grupos_ramas = red_por_ramas.dfs_por_ramas(
                 longitud_objetivo_m=1000.0,
                 tolerancia_km=0.2
             )
@@ -806,8 +808,9 @@ def main(input_dir='./data', output_dir='./data', algoritmo='lineal'):
             # Comparar resultados
             _comparar_algoritmos(grupos_lineal, grupos_ramas, output_dir)
             
-            # Usar el algoritmo por ramas como resultado final
+            # Usar el algoritmo por ramas como resultado final (sobreescribir red con red_por_ramas)
             grupos = grupos_ramas
+            red = red_por_ramas
         
         # 3. Analizar resultados
         red.analizar_resultados(output_dir)
