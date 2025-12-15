@@ -4,6 +4,38 @@ Este proyecto implementa un algoritmo basado en **DFS (Depth-First Search)** y *
 
 Es útil para la gestión de activos, planificación de mantenimiento y análisis de redes de distribución de media tensión.
 
+## 🏗️ Arquitectura del Proyecto
+
+El proyecto está organizado en tres módulos principales que pueden funcionar de forma **standalone** o como **librerías**:
+
+1. **`oracle_export.py`** - Exporta datos desde Oracle a CSV
+   - ✅ Modo standalone: `python oracle_export.py --circuito "12 0m4n"`
+   - ✅ Modo librería: `import oracle_export; oracle_export.export_from_oracle(...)`
+
+2. **`agrupar_circuitos.py`** - Agrupa segmentos de circuitos en tramos de ~1km
+   - ✅ Modo standalone: `python agrupar_circuitos.py --input-dir ./data`
+   - ✅ Modo librería: `import agrupar_circuitos; agrupar_circuitos.main(...)`
+
+3. **`main.py`** - Pipeline integrado completo (Oracle → Agrupación)
+   - ✅ Modo standalone solamente: `python main.py --circuito "12 0m4n"`
+   - ❌ No diseñado para importarse como librería
+
+### Pipeline Integrado
+
+```mermaid
+flowchart LR
+    A[Oracle DB] -->|oracle_export.py| B[CSV Files]
+    B -->|agrupar_circuitos.py| C[Grupos ~1km]
+    C --> D[GeoJSON/GPKG]
+    
+    E[main.py] -.->|integra| F[oracle_export.py]
+    E -.->|integra| G[agrupar_circuitos.py]
+    
+    style E fill:#f9f,stroke:#333
+    style A fill:#bbf,stroke:#333
+    style D fill:#bfb,stroke:#333
+```
+
 ## 📋 Características
 
 - **Carga de Datos**: 
@@ -33,9 +65,36 @@ pip install pandas networkx numpy geopandas shapely
 
 ## 🛠️ Uso
 
-### Uso Básico
+### 🚀 Pipeline Integrado (main.py)
 
-Ejecuta el script principal con los parámetros por defecto:
+**Recomendado**: Ejecuta el pipeline completo desde Oracle hasta la agrupación con un solo comando:
+
+```bash
+# Pipeline completo: Oracle → CSV → Agrupación
+python main.py --circuito "12 0m4n"
+
+# Omitir Oracle y usar CSV existentes
+python main.py --circuito "12 0m4n" --skip-oracle
+
+# Especificar directorio de salida
+python main.py --circuito "MT-001" --output-dir ./resultados
+
+# Modo verboso para debugging
+python main.py --circuito "12 0m4n" --verbose
+```
+
+**Parámetros de main.py:**
+- `--circuito` (REQUERIDO): Código del circuito a procesar
+- `--config`: Ruta al archivo de configuración Oracle (default: `Connect.ini`)
+- `--output-dir`: Directorio de salida (default: `./data`)
+- `--skip-oracle`: Omitir exportación Oracle y usar CSV existentes
+- `--verbose, -v`: Mostrar información detallada
+
+### 📦 Uso Individual de Módulos
+
+#### agrupar_circuitos.py (Standalone)
+
+Ejecuta solo la agrupación con archivos CSV existentes:
 
 ```bash
 python agrupar_circuitos.py
@@ -83,6 +142,89 @@ Todos los archivos de salida se generan en el directorio especificado por `--out
 2. `segmentos_con_grupo.csv`: Detalle de cada segmento con su ID de grupo asignado.
 3. `segmentos_con_grupos.geojson`: Archivo geoespacial en formato GeoJSON para GIS.
 4. `segmentos_con_grupos.gpkg`: Archivo geoespacial en formato GeoPackage para GIS.
+
+## 📚 Uso como Librería
+
+Los módulos `oracle_export.py` y `agrupar_circuitos.py` pueden importarse y usarse como librerías en tus propios scripts:
+
+### Ejemplo 1: Usar oracle_export.py como librería
+
+```python
+import oracle_export
+
+# Opción 1: Obtener rutas de archivos CSV generados
+files = oracle_export.export_from_oracle(
+    config_file='Connect.ini',
+    circuito='12 0m4n'
+)
+print(f"Nodos: {files['nodes']}")
+print(f"Segmentos: {files['lines']}")
+
+# Opción 2: Obtener DataFrames directamente
+df_nodos, df_segmentos = oracle_export.export_from_oracle(
+    config_file='Connect.ini',
+    circuito='12 0m4n',
+    return_dataframes=True
+)
+print(f"Total nodos: {len(df_nodos)}")
+print(f"Total segmentos: {len(df_segmentos)}")
+```
+
+### Ejemplo 2: Usar agrupar_circuitos.py como librería
+
+```python
+import agrupar_circuitos
+
+# Ejecutar agrupación
+result = agrupar_circuitos.main(
+    input_dir='./data',
+    output_dir='./data'
+)
+
+if result['success']:
+    print(f"Grupos generados: {result['stats']['num_grupos']}")
+    print(f"Segmentos procesados: {result['stats']['num_segmentos']}")
+    
+    # Acceder al grafo NetworkX
+    red = result['red']
+    print(f"Nodos en grafo: {red.G.number_of_nodes()}")
+    
+    # Acceder a los grupos
+    for grupo_id, info in result['grupos'].items():
+        print(f"Grupo {grupo_id}: {info['longitud_km']:.2f} km")
+else:
+    print(f"Error: {result['error']}")
+```
+
+### Ejemplo 3: Pipeline completo programático
+
+```python
+import oracle_export
+import agrupar_circuitos
+
+# Paso 1: Exportar desde Oracle
+print("Exportando desde Oracle...")
+df_nodos, df_segmentos = oracle_export.export_from_oracle(
+    config_file='Connect.ini',
+    circuito='12 0m4n',
+    return_dataframes=True
+)
+
+# Paso 2: Agrupar circuitos
+print("Agrupando circuitos...")
+result = agrupar_circuitos.main(
+    input_dir='./data',
+    output_dir='./data'
+)
+
+# Paso 3: Procesar resultados
+if result['success']:
+    print(f"✅ Pipeline completado")
+    print(f"   Grupos: {result['stats']['num_grupos']}")
+    print(f"   Archivos: {result['files']}")
+```
+
+**Nota**: `main.py` está diseñado **ÚNICAMENTE** para ejecución standalone y no debe importarse como librería. Para uso programático, importar `oracle_export` y `agrupar_circuitos` directamente.
 
 ## 🧩 Diagrama Funcional
 
@@ -183,10 +325,21 @@ Para usar la exportación desde Oracle, se requiere:
 cp Connect.ini.example Connect.ini
 # Editar Connect.ini con credenciales
 
-# Generar CSV desde Oracle
-# Los archivos se guardarán en el directorio especificado
-python oracle_export.py --output-dir ./data
+# Opción 1: Pipeline integrado (RECOMENDADO)
+python main.py --circuito "12 0m4n"
 
-# Usar con agrupar_circuitos.py
+# Opción 2: Módulos individuales
+# Paso 1: Generar CSV desde Oracle
+python oracle_export.py --circuito "12 0m4n" --output-dir ./data
+
+# Paso 2: Agrupar circuitos
 python agrupar_circuitos.py --input-dir ./data --output-dir ./data
 ```
+
+### Integración
+
+Los tres módulos están diseñados para trabajar juntos:
+
+1. **`main.py`** proporciona un pipeline completo y simplificado
+2. **`oracle_export.py`** y **`agrupar_circuitos.py`** pueden usarse independientemente o como librerías
+3. Todos los módulos generan archivos CSV compatibles entre sí
