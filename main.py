@@ -75,7 +75,8 @@ def main_pipeline(
     config_file: str = "Connect.ini",
     output_dir: str = "./data",
     skip_oracle: bool = False,
-    verbose: bool = False
+    verbose: bool = False,
+    algoritmo: str = "lineal"
 ) -> Dict[str, Any]:
     """
     Pipeline completo: Oracle Export → Agrupación de Circuitos.
@@ -86,6 +87,7 @@ def main_pipeline(
         output_dir: Directorio de salida para archivos CSV y resultados
         skip_oracle: Si True, salta la exportación de Oracle (usa CSV existentes)
         verbose: Si True, muestra información detallada
+        algoritmo: Algoritmo de agrupación ('lineal', 'por-ramas', o 'ambos')
         
     Returns:
         Dict con resultados del pipeline completo:
@@ -179,11 +181,13 @@ def main_pipeline(
         print("\n" + "=" * 70)
         print("PASO 2: AGRUPACIÓN DE CIRCUITOS")
         print("=" * 70)
+        print(f"   • Algoritmo: {algoritmo}")
         
         # Ejecutar agrupación usando el módulo como librería
         agrupacion_result = agrupar_circuitos.main(
             input_dir=output_dir,
-            output_dir=output_dir
+            output_dir=output_dir,
+            algoritmo=algoritmo
         )
         result['agrupacion'] = agrupacion_result
         
@@ -292,6 +296,14 @@ Nota: Este script integra oracle_export.py y agrupar_circuitos.py.
     )
     
     parser.add_argument(
+        '--algoritmo',
+        type=str,
+        default='lineal',
+        choices=['lineal', 'por-ramas', 'ambos'],
+        help='Algoritmo de agrupación: "lineal" (DFS secuencial), "por-ramas" (agrupa por ramas), o "ambos" (ejecuta ambos y compara) (default: lineal)'
+    )
+    
+    parser.add_argument(
         '--verbose', '-v',
         action='store_true',
         help='Modo verboso (mostrar información detallada)'
@@ -315,7 +327,8 @@ Nota: Este script integra oracle_export.py y agrupar_circuitos.py.
             config_file=args.config,
             output_dir=args.output_dir,
             skip_oracle=args.skip_oracle,
-            verbose=args.verbose
+            verbose=args.verbose,
+            algoritmo=args.algoritmo
         )
         
         # Exit con código apropiado
