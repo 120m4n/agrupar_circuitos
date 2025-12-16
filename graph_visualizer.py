@@ -345,6 +345,23 @@ def create_cytoscape_html(output_dir: str, json_filename: str, stats: Dict, titl
         stats_html_lines.append('</div>')
         stats_html = '\n'.join(stats_html_lines)
 
+        # Build dynamic legend based on actual node types in the data
+        legend_html_lines = []
+        legend_html_lines.append('<div class="legend">')
+        legend_html_lines.append('<h2>🎨 Leyenda</h2>')
+        
+        # Get node types from stats and generate legend items dynamically
+        node_types = stats.get('node_types', {})
+        for node_type in sorted(node_types.keys()):
+            color = get_node_color(node_type)
+            legend_html_lines.append('<div class="legend-item">')
+            legend_html_lines.append(f'<div class="legend-color" style="background: {color};"></div>')
+            legend_html_lines.append(f'<span>{node_type}</span>')
+            legend_html_lines.append('</div>')
+        
+        legend_html_lines.append('</div>')
+        legend_html = '\n'.join(legend_html_lines)
+
         # Enhanced Cytoscape HTML template with improved UI/UX
         json_basename = os.path.basename(json_filename)
         # Use a placeholder template (not an f-string) to avoid brace-escaping issues
@@ -624,25 +641,7 @@ def create_cytoscape_html(output_dir: str, json_filename: str, stats: Dict, titl
                     
                     <<<STATS_HTML>>>
                     
-                    <div class="legend">
-                        <h2>🎨 Leyenda</h2>
-                        <div class="legend-item">
-                            <div class="legend-color" style="background: #FF0000;"></div>
-                            <span>Subestación</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color" style="background: #FFD700;"></div>
-                            <span>Derivación</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color" style="background: #32CD32;"></div>
-                            <span>Transformador</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color" style="background: #4169E1;"></div>
-                            <span>Apoyo</span>
-                        </div>
-                    </div>
+                    <<<LEGEND_HTML>>>
                     
                     <div class="timestamp">
                         🕐 Generado: <<<GEN_TIME>>>
@@ -743,8 +742,7 @@ def create_cytoscape_html(output_dir: str, json_filename: str, stats: Dict, titl
                         ],
                         layout: { 
                             name: 'cose-bilkent',
-                            animate: true,
-                            animationDuration: 1000,
+                            animate: false,
                             fit: true,
                             padding: 50,
                             randomize: false,
@@ -752,7 +750,6 @@ def create_cytoscape_html(output_dir: str, json_filename: str, stats: Dict, titl
                             idealEdgeLength: 100,
                             edgeElasticity: 0.45,
                             nestingFactor: 0.1,
-                            gravity: 0.25,
                             numIter: 2500,
                             tile: true,
                             tilingPaddingVertical: 10,
@@ -831,7 +828,7 @@ def create_cytoscape_html(output_dir: str, json_filename: str, stats: Dict, titl
     """
 
         gen_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        html_content = html_template.replace('<<<TITLE>>>', title).replace('<<<STATS_HTML>>>', stats_html).replace('<<<JSON>>>', json_basename).replace('<<<GEN_TIME>>>', gen_time)
+        html_content = html_template.replace('<<<TITLE>>>', title).replace('<<<STATS_HTML>>>', stats_html).replace('<<<LEGEND_HTML>>>', legend_html).replace('<<<JSON>>>', json_basename).replace('<<<GEN_TIME>>>', gen_time)
 
         # write files: ensure JSON is copied/moved in same output_dir so fetch path works
         # (json already written by export_cytoscape_json into output_dir)
