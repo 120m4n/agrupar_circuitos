@@ -289,6 +289,19 @@ def create_cytoscape_html(output_dir: str, json_filename: str, stats: Dict, titl
         Create a standalone HTML file that loads the cytoscape JSON via fetch
         and renders the graph using Cytoscape.js. Also displays the graph statistics
         in a side panel to preserve presentation.
+        
+        Layout Algorithm: cose-bilkent
+        -------------------------------
+        Uses the cose-bilkent layout algorithm which is specifically designed for:
+        - Hierarchical network structures (like electrical distribution systems)
+        - Force-directed positioning with high quality results
+        - Automatic minimization of edge crossings
+        - Clear visualization of tree-like structures with branches
+        - Superior to circle layout for showing network flow and topology
+        
+        This layout is ideal for electrical networks as it naturally shows the 
+        hierarchical flow from the substation through the distribution network,
+        making it easy to understand the network topology and identify branches.
         """
         os.makedirs(output_dir, exist_ok=True)
         html_path = os.path.join(output_dir, 'red_electrica_cytoscape.html')
