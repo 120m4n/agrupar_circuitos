@@ -542,13 +542,15 @@ def main(
                 result['cytoscape_html'] = cyto_html
                 result['output_file'] = cyto_html
             else:
+                error_msg = "Failed to export Cytoscape JSON file"
                 result['cytoscape_html'] = None
-                result['error'] = "Failed to export Cytoscape JSON file"
-                print(f"⚠️ Error: Failed to export Cytoscape JSON file")
+                result['error'] = error_msg
+                print(f"⚠️ Error: {error_msg}")
                 return result
         except Exception as e:
-            result['error'] = f"Failed to create Cytoscape visualization: {str(e)}"
-            print(f"⚠️ Error creating Cytoscape visualization: {str(e)}")
+            error_msg = f"Failed to create Cytoscape visualization: {e}"
+            result['error'] = error_msg
+            print(f"⚠️ {error_msg}")
             return result
             
         result['success'] = True
