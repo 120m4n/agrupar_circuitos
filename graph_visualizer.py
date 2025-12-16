@@ -172,6 +172,10 @@ def get_node_color(node_type: str) -> str:
     color_map = {
         'Subestacion': '#FF0000',      # Red
         'Apoyo': '#4169E1',             # Royal Blue
+        'AEREO': '#4169E1',             # Royal Blue
+        'POSTE EN H': "#748DDA",      # Royal Blue
+        'CAJA DE INSPECCION': "#604603", # Royal Blue
+        'INTERRUPTORDIS': "#53128F",     # Royal Blue
         'Derivacion': '#FFD700',        # Gold
         'Transformador': '#32CD32',     # Lime Green
     }
@@ -741,19 +745,7 @@ def create_cytoscape_html(output_dir: str, json_filename: str, stats: Dict, titl
                             }
                         ],
                         layout: { 
-                            name: 'cose-bilkent',
-                            animate: false,
-                            fit: true,
-                            padding: 50,
-                            randomize: false,
-                            nodeRepulsion: 4500,
-                            idealEdgeLength: 100,
-                            edgeElasticity: 0.45,
-                            nestingFactor: 0.1,
-                            numIter: 2500,
-                            tile: true,
-                            tilingPaddingVertical: 10,
-                            tilingPaddingHorizontal: 10
+                            name: 'cose-bilkent'
                         }
                     });
                     
