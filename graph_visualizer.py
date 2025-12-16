@@ -490,6 +490,30 @@ def create_cytoscape_html(output_dir: str, json_filename: str, stats: Dict, titl
                 margin-bottom: 8px;
             }
             
+            .layout-select {
+                width: 100%;
+                padding: 10px;
+                border: 2px solid #cbd5e0;
+                border-radius: 6px;
+                font-size: 14px;
+                color: #2d3748;
+                background-color: white;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                font-weight: 500;
+            }
+            
+            .layout-select:hover {
+                border-color: #4299e1;
+                box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
+            }
+            
+            .layout-select:focus {
+                outline: none;
+                border-color: #4299e1;
+                box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.2);
+            }
+            
             .btn {
                 padding: 10px 16px;
                 border: none;
@@ -616,6 +640,8 @@ def create_cytoscape_html(output_dir: str, json_filename: str, stats: Dict, titl
         </style>
         <script src="https://unpkg.com/cytoscape@3.24.0/dist/cytoscape.min.js"></script>
         <script src="https://unpkg.com/cytoscape-cose-bilkent@4.0.0/cytoscape-cose-bilkent.js"></script>
+        <script src="https://unpkg.com/dagre@0.8.5/dist/dagre.js"></script>
+        <script src="https://unpkg.com/cytoscape-dagre@2.3.2/cytoscape-dagre.js"></script>
     </head>
     <body>
         <div id="container">
@@ -630,8 +656,17 @@ def create_cytoscape_html(output_dir: str, json_filename: str, stats: Dict, titl
                                 🏷️ Mostrar Etiquetas
                             </button>
                         </div>
+
                         <div class="control-group">
-                            <label>🔍 Zoom</label>
+                            <label>📐 Layout</label>
+                            <select id="layoutSelect" class="layout-select">
+                                <option value="cose-bilkent">COSe Bilkent (Jerárquico)</option>
+                                <option value="dagre">Dagre (Jerárquico)</option>
+                                <option value="breadthfirst">Breadth First (Árbol)</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <labe>�🔍 Zoom</label>
                             <div class="btn-group">
                                 <button id="zoomIn" class="btn btn-secondary">Acercar +</button>
                                 <button id="zoomOut" class="btn btn-secondary">Alejar -</button>
@@ -771,6 +806,41 @@ def create_cytoscape_html(output_dir: str, json_filename: str, stats: Dict, titl
                                 .update();
                             toggleButton.textContent = '🏷️ Mostrar Etiquetas';
                         }
+                    });
+                    
+                    // Layout selector
+                    const layoutSelect = document.getElementById('layoutSelect');
+                    layoutSelect.addEventListener('change', function() {
+                        const newLayout = this.value;
+                        console.log('Changing layout to:', newLayout);
+                        
+                        let layoutConfig = { 
+                            name: newLayout,
+                            animate: true,
+                            animationDuration: 500
+                        };
+                        
+                        // Configuraciones específicas por layout
+                        if (newLayout === 'breadthfirst') {
+                            layoutConfig = {
+                                name: 'breadthfirst',
+                                animate: true,
+                                animationDuration: 500,
+                                directed: false,
+                                roots: '[tipo = "Subestacion"]', // Inicia desde subestación
+                                spacingFactor: 1.5,
+                                avoidOverlap: true
+                            };
+                        } else if (newLayout === 'dagre') {
+                            layoutConfig = {
+                                name: 'dagre',
+                                animate: true,
+                                animationDuration: 500,
+                                rankDir: 'TB' // Top to Bottom (vertical)
+                            };
+                        }
+                        
+                        cy.layout(layoutConfig).run();
                     });
                     
                     // Zoom controls
