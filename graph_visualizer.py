@@ -352,7 +352,7 @@ def create_cytoscape_html(output_dir: str, json_filename: str, stats: Dict, titl
         
         # Get node types from stats and generate legend items dynamically
         node_types = stats.get('node_types', {})
-        for node_type in sorted(node_types.keys()):
+        for node_type in sorted(node_types):
             color = get_node_color(node_type)
             legend_html_lines.append('<div class="legend-item">')
             legend_html_lines.append(f'<div class="legend-color" style="background: {color};"></div>')
