@@ -290,6 +290,16 @@ def create_cytoscape_html(output_dir: str, json_filename: str, stats: Dict, titl
         and renders the graph using Cytoscape.js. Also displays the graph statistics
         in a side panel to preserve presentation.
         
+        UI/UX Improvements:
+        -------------------
+        - Modern, clean design with improved color scheme
+        - Toggle button to show/hide all node labels conditionally
+        - Interactive zoom controls (Zoom In, Zoom Out, Reset, Fit)
+        - Better visual hierarchy and spacing
+        - Responsive layout with enhanced styling
+        - Improved node and edge styling
+        - Smooth animations and transitions
+        
         Layout Algorithm: cose-bilkent
         -------------------------------
         Uses the cose-bilkent layout algorithm which is specifically designed for:
@@ -308,27 +318,34 @@ def create_cytoscape_html(output_dir: str, json_filename: str, stats: Dict, titl
 
         # Build an HTML snippet for stats (simple layout preserving values)
         stats_html_lines = []
-        stats_html_lines.append(f"<h2>GRAPH STATISTICS</h2>")
+        stats_html_lines.append(f"<h2>📊 Estadísticas del Grafo</h2>")
         stats_html_lines.append('<div class="stat-block">')
-        stats_html_lines.append(f"<p><strong>Nodes:</strong> {stats.get('num_nodes', 0)}</p>")
-        stats_html_lines.append(f"<p><strong>Edges:</strong> {stats.get('num_edges', 0)}</p>")
-        stats_html_lines.append(f"<p><strong>Connected:</strong> {'Yes' if stats.get('is_connected') else 'No'}</p>")
-        stats_html_lines.append(f"<p><strong>Components:</strong> {stats.get('num_components')}</p>")
-        stats_html_lines.append(f"<p><strong>Density:</strong> {stats.get('density', 0):.4f}</p>")
+        stats_html_lines.append('<div class="stat-section">')
+        stats_html_lines.append('<h3>🔢 Propiedades</h3>')
+        stats_html_lines.append(f"<p><span class='stat-label'>Nodos:</span> <span class='stat-value'>{stats.get('num_nodes', 0)}</span></p>")
+        stats_html_lines.append(f"<p><span class='stat-label'>Aristas:</span> <span class='stat-value'>{stats.get('num_edges', 0)}</span></p>")
+        stats_html_lines.append(f"<p><span class='stat-label'>Conectado:</span> <span class='stat-value'>{'Sí' if stats.get('is_connected') else 'No'}</span></p>")
+        stats_html_lines.append(f"<p><span class='stat-label'>Componentes:</span> <span class='stat-value'>{stats.get('num_components')}</span></p>")
+        stats_html_lines.append(f"<p><span class='stat-label'>Densidad:</span> <span class='stat-value'>{stats.get('density', 0):.4f}</span></p>")
         if stats.get('diameter') is not None:
-                stats_html_lines.append(f"<p><strong>Diameter:</strong> {stats.get('diameter')}</p>")
-        stats_html_lines.append('<h3>Node Types</h3>')
+                stats_html_lines.append(f"<p><span class='stat-label'>Diámetro:</span> <span class='stat-value'>{stats.get('diameter')}</span></p>")
+        stats_html_lines.append('</div>')
+        stats_html_lines.append('<div class="stat-section">')
+        stats_html_lines.append('<h3>🏗️ Tipos de Nodos</h3>')
         for t, c in stats.get('node_types', {}).items():
-                stats_html_lines.append(f"<p><strong>{t}:</strong> {c}</p>")
-        stats_html_lines.append('<h3>Edge Lengths</h3>')
-        stats_html_lines.append(f"<p><strong>Total:</strong> {stats.get('total_length_km', 0):.2f} km ({stats.get('total_length_m', 0):.1f} m)</p>")
-        stats_html_lines.append(f"<p><strong>Average:</strong> {stats.get('avg_edge_length_m', 0):.1f} m</p>")
-        stats_html_lines.append(f"<p><strong>Min:</strong> {stats.get('min_edge_length_m', 0):.1f} m</p>")
-        stats_html_lines.append(f"<p><strong>Max:</strong> {stats.get('max_edge_length_m', 0):.1f} m</p>")
+                stats_html_lines.append(f"<p><span class='stat-label'>{t}:</span> <span class='stat-value'>{c}</span></p>")
+        stats_html_lines.append('</div>')
+        stats_html_lines.append('<div class="stat-section">')
+        stats_html_lines.append('<h3>📏 Longitudes</h3>')
+        stats_html_lines.append(f"<p><span class='stat-label'>Total:</span> <span class='stat-value'>{stats.get('total_length_km', 0):.2f} km</span></p>")
+        stats_html_lines.append(f"<p><span class='stat-label'>Promedio:</span> <span class='stat-value'>{stats.get('avg_edge_length_m', 0):.1f} m</span></p>")
+        stats_html_lines.append(f"<p><span class='stat-label'>Mínimo:</span> <span class='stat-value'>{stats.get('min_edge_length_m', 0):.1f} m</span></p>")
+        stats_html_lines.append(f"<p><span class='stat-label'>Máximo:</span> <span class='stat-value'>{stats.get('max_edge_length_m', 0):.1f} m</span></p>")
+        stats_html_lines.append('</div>')
         stats_html_lines.append('</div>')
         stats_html = '\n'.join(stats_html_lines)
 
-        # Simple Cytoscape HTML template using CDN
+        # Enhanced Cytoscape HTML template with improved UI/UX
         json_basename = os.path.basename(json_filename)
         # Use a placeholder template (not an f-string) to avoid brace-escaping issues
         html_template = """
@@ -339,12 +356,242 @@ def create_cytoscape_html(output_dir: str, json_filename: str, stats: Dict, titl
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title><<<TITLE>>></title>
         <style>
-            body { margin:0; font-family: Arial, Helvetica, sans-serif; }
-            #container { display:flex; height:100vh; }
-            #cy { flex:1; border-left:1px solid #ddd; }
-            #sidebar { width:320px; padding:16px; box-sizing:border-box; background:#f7f7f7; overflow:auto; }
-            h1,h2 { margin:8px 0; }
-            .stat-block p { margin:6px 0; }
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            
+            body { 
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+                background: #f5f7fa;
+                color: #2c3e50;
+            }
+            
+            #container { 
+                display: flex; 
+                height: 100vh;
+                overflow: hidden;
+            }
+            
+            #sidebar { 
+                width: 340px; 
+                background: linear-gradient(to bottom, #ffffff 0%, #f8f9fa 100%);
+                box-shadow: 2px 0 10px rgba(0,0,0,0.08);
+                overflow-y: auto;
+                z-index: 10;
+            }
+            
+            #sidebar-content {
+                padding: 24px;
+            }
+            
+            h1 { 
+                font-size: 22px;
+                font-weight: 700;
+                color: #1a202c;
+                margin-bottom: 8px;
+                padding-bottom: 12px;
+                border-bottom: 3px solid #4299e1;
+            }
+            
+            h2 { 
+                font-size: 18px;
+                font-weight: 600;
+                color: #2d3748;
+                margin: 24px 0 16px 0;
+            }
+            
+            h3 {
+                font-size: 14px;
+                font-weight: 600;
+                color: #4a5568;
+                margin: 16px 0 8px 0;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+            
+            .stat-block {
+                background: white;
+                border-radius: 8px;
+                padding: 16px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            }
+            
+            .stat-section {
+                margin-bottom: 16px;
+                padding-bottom: 16px;
+                border-bottom: 1px solid #e2e8f0;
+            }
+            
+            .stat-section:last-child {
+                border-bottom: none;
+                padding-bottom: 0;
+                margin-bottom: 0;
+            }
+            
+            .stat-block p { 
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin: 8px 0;
+                padding: 6px 0;
+                font-size: 14px;
+            }
+            
+            .stat-label {
+                color: #718096;
+                font-weight: 500;
+            }
+            
+            .stat-value {
+                color: #2d3748;
+                font-weight: 600;
+            }
+            
+            #controls-panel {
+                background: white;
+                border-radius: 8px;
+                padding: 16px;
+                margin-top: 20px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            }
+            
+            #controls-panel h2 {
+                margin-top: 0;
+            }
+            
+            .control-group {
+                margin: 12px 0;
+            }
+            
+            .control-group label {
+                display: block;
+                font-size: 13px;
+                font-weight: 600;
+                color: #4a5568;
+                margin-bottom: 8px;
+            }
+            
+            .btn {
+                padding: 10px 16px;
+                border: none;
+                border-radius: 6px;
+                font-size: 14px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                width: 100%;
+                margin: 4px 0;
+                display: inline-block;
+                text-align: center;
+            }
+            
+            .btn-primary {
+                background: #4299e1;
+                color: white;
+            }
+            
+            .btn-primary:hover {
+                background: #3182ce;
+                transform: translateY(-1px);
+                box-shadow: 0 4px 8px rgba(66, 153, 225, 0.3);
+            }
+            
+            .btn-secondary {
+                background: #e2e8f0;
+                color: #2d3748;
+            }
+            
+            .btn-secondary:hover {
+                background: #cbd5e0;
+                transform: translateY(-1px);
+            }
+            
+            .btn-group {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+                margin-top: 8px;
+            }
+            
+            .legend {
+                background: white;
+                border-radius: 8px;
+                padding: 16px;
+                margin-top: 20px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            }
+            
+            .legend h2 {
+                margin-top: 0;
+            }
+            
+            .legend-item {
+                display: flex;
+                align-items: center;
+                margin: 10px 0;
+                font-size: 13px;
+            }
+            
+            .legend-color {
+                width: 20px;
+                height: 20px;
+                border-radius: 50%;
+                margin-right: 10px;
+                border: 2px solid #e2e8f0;
+            }
+            
+            .timestamp {
+                margin-top: 20px;
+                padding-top: 16px;
+                border-top: 1px solid #e2e8f0;
+                font-size: 12px;
+                color: #a0aec0;
+                text-align: center;
+            }
+            
+            #graph-container {
+                flex: 1;
+                position: relative;
+                background: #ffffff;
+            }
+            
+            #cy { 
+                width: 100%;
+                height: 100%;
+                background: linear-gradient(135deg, #f5f7fa 0%, #ffffff 100%);
+            }
+            
+            /* Scrollbar styling for sidebar */
+            #sidebar::-webkit-scrollbar {
+                width: 8px;
+            }
+            
+            #sidebar::-webkit-scrollbar-track {
+                background: #f1f1f1;
+            }
+            
+            #sidebar::-webkit-scrollbar-thumb {
+                background: #cbd5e0;
+                border-radius: 4px;
+            }
+            
+            #sidebar::-webkit-scrollbar-thumb:hover {
+                background: #a0aec0;
+            }
+            
+            /* Responsive design */
+            @media (max-width: 768px) {
+                #container {
+                    flex-direction: column;
+                }
+                
+                #sidebar {
+                    width: 100%;
+                    max-height: 40vh;
+                }
+                
+                #graph-container {
+                    height: 60vh;
+                }
+            }
         </style>
         <script src="https://unpkg.com/cytoscape@3.24.0/dist/cytoscape.min.js"></script>
         <script src="https://unpkg.com/cytoscape-cose-bilkent@4.0.0/cytoscape-cose-bilkent.js"></script>
@@ -352,30 +599,209 @@ def create_cytoscape_html(output_dir: str, json_filename: str, stats: Dict, titl
     <body>
         <div id="container">
             <div id="sidebar">
-                <h1><<<TITLE>>></h1>
-                <<<STATS_HTML>>>
-                <p style="margin-top:12px; font-size:0.9em; color:#666;">Generado: <<<GEN_TIME>>></p>
+                <div id="sidebar-content">
+                    <h1>⚡ <<<TITLE>>></h1>
+                    
+                    <div id="controls-panel">
+                        <h2>🎛️ Controles</h2>
+                        <div class="control-group">
+                            <button id="toggleLabels" class="btn btn-primary">
+                                🏷️ Mostrar/Ocultar Etiquetas
+                            </button>
+                        </div>
+                        <div class="control-group">
+                            <label>🔍 Zoom</label>
+                            <div class="btn-group">
+                                <button id="zoomIn" class="btn btn-secondary">Acercar +</button>
+                                <button id="zoomOut" class="btn btn-secondary">Alejar -</button>
+                            </div>
+                            <div class="btn-group">
+                                <button id="resetZoom" class="btn btn-secondary">Resetear</button>
+                                <button id="fitGraph" class="btn btn-secondary">Ajustar</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <<<STATS_HTML>>>
+                    
+                    <div class="legend">
+                        <h2>🎨 Leyenda</h2>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #FF0000;"></div>
+                            <span>Subestación</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #FFD700;"></div>
+                            <span>Derivación</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #32CD32;"></div>
+                            <span>Transformador</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #4169E1;"></div>
+                            <span>Apoyo</span>
+                        </div>
+                    </div>
+                    
+                    <div class="timestamp">
+                        🕐 Generado: <<<GEN_TIME>>>
+                    </div>
+                </div>
             </div>
-            <div id="cy"></div>
+            <div id="graph-container">
+                <div id="cy"></div>
+            </div>
         </div>
 
         <script>
+            let cy;
+            let labelsVisible = false;
+            
             fetch('<<<JSON>>>')
                 .then(r => r.json())
                 .then(data => {
-                    const cy = cytoscape({
+                    cy = cytoscape({
                         container: document.getElementById('cy'),
                         elements: data.elements,
                         style: [
-                            { selector: 'node', style: { 'label': 'data(nombre)', 'background-color': 'data(color)', 'width': 'mapData(voltaje_kv, 0, 35, 20,40)', 'height': 'mapData(voltaje_kv, 0, 35, 20,40)', 'text-valign': 'center', 'color': '#fff', 'text-outline-width': 2, 'text-outline-color': '#333' } },
-                            { selector: "node[tipo != 'Subestacion']", style: { 'label': '' } },
-                            { selector: 'edge', style: { 'width': 'data(width)', 'line-color': 'data(color)', 'curve-style': 'bezier' } }
+                            { 
+                                selector: 'node', 
+                                style: { 
+                                    'label': '',
+                                    'background-color': 'data(color)', 
+                                    'width': 'mapData(voltaje_kv, 0, 35, 20, 50)', 
+                                    'height': 'mapData(voltaje_kv, 0, 35, 20, 50)', 
+                                    'text-valign': 'center', 
+                                    'text-halign': 'center',
+                                    'color': '#2d3748', 
+                                    'text-outline-width': 3, 
+                                    'text-outline-color': '#ffffff',
+                                    'font-size': '11px',
+                                    'font-weight': 'bold',
+                                    'border-width': 2,
+                                    'border-color': '#ffffff',
+                                    'border-opacity': 0.8,
+                                    'transition-property': 'background-color, border-color',
+                                    'transition-duration': '0.3s'
+                                } 
+                            },
+                            { 
+                                selector: 'node:selected', 
+                                style: { 
+                                    'border-width': 4,
+                                    'border-color': '#4299e1',
+                                    'border-opacity': 1
+                                } 
+                            },
+                            { 
+                                selector: 'node[tipo = "Subestacion"]', 
+                                style: { 
+                                    'label': 'data(nombre)',
+                                    'font-size': '13px',
+                                    'border-width': 3
+                                } 
+                            },
+                            { 
+                                selector: 'edge', 
+                                style: { 
+                                    'width': 'data(width)', 
+                                    'line-color': '#a0aec0', 
+                                    'curve-style': 'bezier',
+                                    'opacity': 0.7,
+                                    'transition-property': 'line-color, width, opacity',
+                                    'transition-duration': '0.3s'
+                                } 
+                            },
+                            { 
+                                selector: 'edge:selected', 
+                                style: { 
+                                    'line-color': '#4299e1',
+                                    'width': 'mapData(width, 1, 5, 3, 8)',
+                                    'opacity': 1
+                                } 
+                            }
                         ],
-                        layout: { name: 'cose-bilkent' }
+                        layout: { 
+                            name: 'cose-bilkent',
+                            animate: true,
+                            animationDuration: 1000,
+                            fit: true,
+                            padding: 50,
+                            randomize: false,
+                            nodeRepulsion: 4500,
+                            idealEdgeLength: 100,
+                            edgeElasticity: 0.45,
+                            nestingFactor: 0.1,
+                            gravity: 0.25,
+                            numIter: 2500,
+                            tile: true,
+                            tilingPaddingVertical: 10,
+                            tilingPaddingHorizontal: 10
+                        }
+                    });
+                    
+                    // Toggle labels button
+                    document.getElementById('toggleLabels').addEventListener('click', function() {
+                        labelsVisible = !labelsVisible;
+                        
+                        if (labelsVisible) {
+                            cy.style()
+                                .selector('node')
+                                .style('label', 'data(nombre)')
+                                .update();
+                        } else {
+                            cy.style()
+                                .selector('node[tipo != "Subestacion"]')
+                                .style('label', '')
+                                .update();
+                            cy.style()
+                                .selector('node[tipo = "Subestacion"]')
+                                .style('label', 'data(nombre)')
+                                .update();
+                        }
+                    });
+                    
+                    // Zoom controls
+                    document.getElementById('zoomIn').addEventListener('click', function() {
+                        cy.zoom({
+                            level: cy.zoom() * 1.2,
+                            renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 }
+                        });
+                    });
+                    
+                    document.getElementById('zoomOut').addEventListener('click', function() {
+                        cy.zoom({
+                            level: cy.zoom() * 0.8,
+                            renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 }
+                        });
+                    });
+                    
+                    document.getElementById('resetZoom').addEventListener('click', function() {
+                        cy.zoom(1);
+                        cy.center();
+                    });
+                    
+                    document.getElementById('fitGraph').addEventListener('click', function() {
+                        cy.fit(null, 50);
+                    });
+                    
+                    // Add interactivity - highlight connected edges on node tap
+                    cy.on('tap', 'node', function(evt) {
+                        const node = evt.target;
+                        cy.elements().removeClass('highlighted');
+                        node.addClass('highlighted');
+                        node.connectedEdges().addClass('highlighted');
+                    });
+                    
+                    cy.on('tap', function(evt) {
+                        if (evt.target === cy) {
+                            cy.elements().removeClass('highlighted');
+                        }
                     });
                 })
                 .catch(err => {
-                    document.getElementById('cy').innerText = 'Error cargando el grafo: ' + err;
+                    document.getElementById('cy').innerHTML = '<div style="padding:40px;text-align:center;color:#e53e3e;font-size:16px;">❌ Error cargando el grafo: ' + err + '</div>';
                 });
         </script>
     </body>
@@ -538,7 +964,7 @@ def main(
             cyto_json = export_cytoscape_json(G, output_dir)
             result['cytoscape_json'] = cyto_json
             if cyto_json:
-                cyto_html = create_cytoscape_html(output_dir, cyto_json, stats, title="Red Eléctrica - Cytoscape")
+                cyto_html = create_cytoscape_html(output_dir, cyto_json, stats, title="Red Eléctrica")
                 result['cytoscape_html'] = cyto_html
                 result['output_file'] = cyto_html
             else:
