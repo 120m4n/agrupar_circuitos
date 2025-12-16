@@ -6,7 +6,7 @@ Es útil para la gestión de activos, planificación de mantenimiento y análisi
 
 ## 🏗️ Arquitectura del Proyecto
 
-El proyecto está organizado en tres módulos principales que pueden funcionar de forma **standalone** o como **librerías**:
+El proyecto está organizado en cuatro módulos principales que pueden funcionar de forma **standalone** o como **librerías**:
 
 1. **`oracle_export.py`** - Exporta datos desde Oracle a CSV
    - ✅ Modo standalone: `python oracle_export.py --circuito "12 0m4n"`
@@ -16,7 +16,13 @@ El proyecto está organizado en tres módulos principales que pueden funcionar d
    - ✅ Modo standalone: `python agrupar_circuitos.py --input-dir ./data`
    - ✅ Modo librería: `import agrupar_circuitos; agrupar_circuitos.main(...)`
 
-3. **`main.py`** - Pipeline integrado completo (Oracle → Agrupación)
+3. **`graph_visualizer.py`** - 🆕 Genera visualización HTML interactiva de la red
+   - ✅ Modo standalone: `python graph_visualizer.py --example`
+   - ✅ Modo librería: `import graph_visualizer; graph_visualizer.main(...)`
+   - 📖 [Ver documentación completa](README_graph_visualizer.md)
+   - 🎨 Usa Cytoscape.js con layout cose-bilkent optimizado para redes eléctricas
+
+4. **`main.py`** - Pipeline integrado completo (Oracle → Agrupación)
    - ✅ Modo standalone solamente: `python main.py --circuito "12 0m4n"`
    - ❌ No diseñado para importarse como librería
 
@@ -338,8 +344,79 @@ python agrupar_circuitos.py --input-dir ./data --output-dir ./data
 
 ### Integración
 
-Los tres módulos están diseñados para trabajar juntos:
+Los módulos están diseñados para trabajar juntos:
 
 1. **`main.py`** proporciona un pipeline completo y simplificado
 2. **`oracle_export.py`** y **`agrupar_circuitos.py`** pueden usarse independientemente o como librerías
 3. Todos los módulos generan archivos CSV compatibles entre sí
+
+## 🎨 Visualización de Grafos (NUEVO)
+
+El proyecto ahora incluye una **herramienta independiente de visualización** que genera gráficos HTML interactivos de la red eléctrica.
+
+### Características de Graph Visualizer
+
+- 🎯 **Totalmente Independiente**: No interfiere con el proceso de agrupación existente
+- 🎨 **Visualización Interactiva**: Usa Cytoscape.js para crear gráficos HTML navegables
+- 🔍 **Información Detallada**: Panel lateral con estadísticas completas del grafo
+- 🎨 **Código de Colores**: Diferentes colores para tipos de nodos (Subestación, Apoyo, Transformador, Derivación)
+- 📊 **Estadísticas del Grafo**: Muestra propiedades topológicas y métricas de la red
+- 📁 **Salida Separada**: Guarda archivos en directorio `graph_output/` independiente
+- 🆓 **Open Source**: Usa bibliotecas libres (NetworkX, Cytoscape.js)
+- 🎯 **Layout Optimizado**: Usa algoritmo cose-bilkent, ideal para redes eléctricas jerárquicas
+
+### Uso Rápido
+
+```bash
+# Instalar dependencias
+pip install -r requirements_graph.txt
+
+# Usar datos de ejemplo
+python graph_visualizer.py --example
+
+# Usar archivos CSV existentes
+python graph_visualizer.py --input-dir ./data
+
+# Personalizar salida
+python graph_visualizer.py --output-dir ./mis_grafos
+```
+
+### Documentación Completa
+
+Para información detallada sobre el visualizador de grafos, consulta:
+
+📖 **[README_graph_visualizer.md](README_graph_visualizer.md)**
+
+La documentación incluye:
+- Características detalladas
+- Instrucciones de instalación
+- Ejemplos de uso
+- Formato de archivos de entrada/salida
+- Uso como librería Python
+- Casos de uso y ejemplos
+- Solución de problemas
+
+### Ejemplo de Integración
+
+Puedes combinar el visualizador con el pipeline existente:
+
+```bash
+# Paso 1: Exportar datos desde Oracle (opcional)
+python oracle_export.py --circuito "12 0m4n" --output-dir ./data
+
+# Paso 2: Agrupar circuitos
+python agrupar_circuitos.py --input-dir ./data --output-dir ./data
+
+# Paso 3: Generar visualización HTML
+python graph_visualizer.py --input-dir ./data --output-dir ./graph_output
+```
+
+O usar todo el pipeline integrado y luego visualizar:
+
+```bash
+# Pipeline completo
+python main.py --circuito "12 0m4n"
+
+# Generar visualización
+python graph_visualizer.py --input-dir ./data
+```
