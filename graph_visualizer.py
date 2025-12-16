@@ -23,6 +23,7 @@ import networkx as nx
 import os
 import sys
 import argparse
+import json
 from typing import Tuple, Dict, Optional
 from datetime import datetime
 
@@ -237,7 +238,7 @@ def create_html_visualization(
         directed=False
     )
     
-    # Set physics options for better layout
+    # Use simplified options: no physics, hierarchical layout for branch clarity
     net.set_options("""
     {
         "nodes": {
@@ -252,101 +253,61 @@ def create_html_visualization(
                 "inherit": true
             },
             "smooth": {
-                "enabled": true,
-                "type": "continuous"
+                "enabled": false
             }
         },
-        "physics": {
-            "enabled": true,
-            "barnesHut": {
-                "gravitationalConstant": -8000,
-                "centralGravity": 0.3,
-                "springLength": 150,
-                "springConstant": 0.04,
-                "damping": 0.09
-            },
-            "stabilization": {
+        "layout": {
+            "hierarchical": {
                 "enabled": true,
-                "iterations": 1000,
-                "updateInterval": 25
+                "direction": "UD",
+                "sortMethod": "directed"
             }
         },
         "interaction": {
-            "hover": true,
-            "tooltipDelay": 100,
+            "hover": false,
             "navigationButtons": true,
             "keyboard": true
         }
     }
     """)
     
-    # Add nodes with attributes
+    # Add nodes with simplified attributes
+    DEFAULT_NODE_COLOR = '#6C757D'  # muted gray for regular nodes
+    DEFAULT_NODE_SIZE = 15
+    DEFAULT_NODE_SHAPE = 'dot'
+    SUBSTATION_COLOR = '#FF0000'
+    SUBSTATION_SIZE = 36
+    SUBSTATION_SHAPE = 'triangle'
+
     for node_id in G.nodes():
         node_data = G.nodes[node_id]
-        
-        color = get_node_color(node_data['tipo'])
-        size = get_node_size(node_data['tipo'])
-        
-        # Create detailed hover tooltip
-        tooltip = (
-            f"<b>{node_data['nombre']}</b><br>"
-            f"ID: {node_id}<br>"
-            f"Tipo: {node_data['tipo']}<br>"
-            f"Voltaje: {node_data['voltaje_kv']} kV<br>"
-            f"Coordenadas: ({node_data['x']:.4f}, {node_data['y']:.4f})"
-        )
-        
-        # Add node label based on type
-        if node_data['tipo'] == 'Subestacion':
-            label = f"🏭 {node_data['nombre']}"
-        elif node_data['tipo'] == 'Transformador':
-            label = f"⚡ {node_id}"
-        elif node_data['tipo'] == 'Derivacion':
-            label = f"⚪ {node_id}"
-        else:
-            label = f"{node_id}"
-        
+
+        is_substation = node_data.get('tipo') == 'Subestacion'
+
+        # Only substation keeps a visible label (its name). Others are uniform and unlabeled.
+        label = node_data.get('nombre') if is_substation else ''
+
         net.add_node(
             node_id,
             label=label,
-            title=tooltip,
-            color=color,
-            size=size,
+            title=None,
+            color=(SUBSTATION_COLOR if is_substation else DEFAULT_NODE_COLOR),
+            size=(SUBSTATION_SIZE if is_substation else DEFAULT_NODE_SIZE),
+            shape=(SUBSTATION_SHAPE if is_substation else DEFAULT_NODE_SHAPE),
             borderWidth=2,
             borderWidthSelected=4
         )
     
-    # Add edges with attributes
-    for edge in G.edges(data=True):
-        u, v, data = edge
-        
-        # Create edge tooltip with segment information
-        tooltip = (
-            f"<b>Segmento {data['id_segmento']}</b><br>"
-            f"De: {u} → A: {v}<br>"
-            f"Longitud: {data['longitud_m']:.1f} m<br>"
-            f"Conductor: {data['tipo_conductor']}<br>"
-            f"Capacidad: {data['capacidad_amp']} A<br>"
-            f"Circuito: {data['id_circuito']}"
-        )
-        
-        # Edge width based on length (shorter = thicker)
-        # Uses scale factor to normalize width between min and max
-        width = max(MIN_EDGE_WIDTH, min(MAX_EDGE_WIDTH, EDGE_WIDTH_SCALE_FACTOR / data['longitud_m']))
-        
-        # Edge color based on conductor type
-        if data['tipo_conductor'].startswith('AAC_150'):
-            edge_color = '#1E90FF'  # Dodger Blue
-        elif data['tipo_conductor'].startswith('AAC_95'):
-            edge_color = '#FFA500'  # Orange
-        else:
-            edge_color = '#808080'  # Gray
-        
+    # Add edges with minimal attributes (no tooltips, fixed style)
+    EDGE_COLOR = '#888888'
+    EDGE_WIDTH = 2
+
+    for u, v, data in G.edges(data=True):
         net.add_edge(
             u, v,
-            title=tooltip,
-            width=width,
-            color=edge_color
+            title=None,
+            width=EDGE_WIDTH,
+            color=EDGE_COLOR
         )
     
     # Add title to the visualization
@@ -382,6 +343,194 @@ def create_html_visualization(
     print(f"✅ HTML visualization saved to: {output_path}")
     
     return output_path
+
+
+def export_minimal_graph_data(G: nx.Graph, output_dir: str) -> dict:
+    """
+    Export minimal node and edge data needed for diagramming.
+
+    Nodes: id_nodo, es_subestacion (bool), nombre (only for substation)
+    Edges: id_segmento, nodo_inicio, nodo_fin
+    """
+    nodes_out = []
+    for node_id in G.nodes():
+        node = G.nodes[node_id]
+        is_sub = node.get('tipo') == 'Subestacion'
+        name = node.get('nombre') if is_sub else ''
+        nodes_out.append({'id_nodo': node_id, 'es_subestacion': is_sub, 'nombre': name})
+
+    edges_out = []
+    for u, v, data in G.edges(data=True):
+        edges_out.append({'id_segmento': data.get('id_segmento'), 'nodo_inicio': u, 'nodo_fin': v})
+
+    # Ensure output dir exists
+    os.makedirs(output_dir, exist_ok=True)
+
+    nodes_path = os.path.join(output_dir, 'graph_nodes_minimal.csv')
+    edges_path = os.path.join(output_dir, 'graph_edges_minimal.csv')
+
+    try:
+        pd.DataFrame(nodes_out).to_csv(nodes_path, index=False)
+        pd.DataFrame(edges_out).to_csv(edges_path, index=False)
+        print(f"✅ Minimal node data saved to: {nodes_path}")
+        print(f"✅ Minimal edge data saved to: {edges_path}")
+    except Exception as e:
+        print(f"⚠️ Error exporting minimal data: {e}")
+        return {'nodes': None, 'edges': None, 'error': str(e)}
+
+    return {'nodes': nodes_path, 'edges': edges_path, 'error': None}
+
+
+def export_cytoscape_json(G: nx.Graph, output_dir: str) -> str:
+        """
+        Export graph to a Cytoscape.js-compatible JSON file.
+
+        Nodes include: id, nombre, tipo, voltaje_kv, x, y, color
+        Edges include: id, source, target, longitud_m, width, color
+        """
+        os.makedirs(output_dir, exist_ok=True)
+
+        elements = []
+        # Nodes
+        for node_id, data in G.nodes(data=True):
+                node_data = {
+                        'id': str(node_id),
+                        'nombre': data.get('nombre', ''),
+                        'tipo': data.get('tipo', ''),
+                        'voltaje_kv': data.get('voltaje_kv'),
+                        'x': data.get('x'),
+                        'y': data.get('y'),
+                        'color': get_node_color(data.get('tipo'))
+                }
+                elements.append({'data': node_data})
+
+        # Edges
+        for u, v, ed in G.edges(data=True):
+                seg_id = ed.get('id_segmento', f"{u}_{v}")
+                longitud = ed.get('longitud_m', 0) or 0
+                width = max(MIN_EDGE_WIDTH, min(MAX_EDGE_WIDTH, longitud / EDGE_WIDTH_SCALE_FACTOR))
+                edge_data = {
+                        'id': str(seg_id),
+                        'source': str(u),
+                        'target': str(v),
+                        'longitud_m': longitud,
+                        'width': width,
+                        'color': '#888888'
+                }
+                elements.append({'data': edge_data})
+
+        out = {'elements': elements}
+        out_path = os.path.join(output_dir, 'graph_cytoscape.json')
+        try:
+                with open(out_path, 'w', encoding='utf-8') as f:
+                        json.dump(out, f, ensure_ascii=False, indent=2)
+                print(f"✅ Cytoscape JSON saved to: {out_path}")
+        except Exception as e:
+                print(f"⚠️ Error saving Cytoscape JSON: {e}")
+                out_path = ''
+
+        return out_path
+
+
+def create_cytoscape_html(output_dir: str, json_filename: str, stats: Dict, title: str = "Red Eléctrica - Cytoscape") -> str:
+        """
+        Create a standalone HTML file that loads the cytoscape JSON via fetch
+        and renders the graph using Cytoscape.js. Also displays the graph statistics
+        in a side panel to preserve presentation.
+        """
+        os.makedirs(output_dir, exist_ok=True)
+        html_path = os.path.join(output_dir, 'red_electrica_cytoscape.html')
+
+        # Build an HTML snippet for stats (simple layout preserving values)
+        stats_html_lines = []
+        stats_html_lines.append(f"<h2>GRAPH STATISTICS</h2>")
+        stats_html_lines.append('<div class="stat-block">')
+        stats_html_lines.append(f"<p><strong>Nodes:</strong> {stats.get('num_nodes', 0)}</p>")
+        stats_html_lines.append(f"<p><strong>Edges:</strong> {stats.get('num_edges', 0)}</p>")
+        stats_html_lines.append(f"<p><strong>Connected:</strong> {'Yes' if stats.get('is_connected') else 'No'}</p>")
+        stats_html_lines.append(f"<p><strong>Components:</strong> {stats.get('num_components')}</p>")
+        stats_html_lines.append(f"<p><strong>Density:</strong> {stats.get('density', 0):.4f}</p>")
+        if stats.get('diameter') is not None:
+                stats_html_lines.append(f"<p><strong>Diameter:</strong> {stats.get('diameter')}</p>")
+        stats_html_lines.append('<h3>Node Types</h3>')
+        for t, c in stats.get('node_types', {}).items():
+                stats_html_lines.append(f"<p><strong>{t}:</strong> {c}</p>")
+        stats_html_lines.append('<h3>Edge Lengths</h3>')
+        stats_html_lines.append(f"<p><strong>Total:</strong> {stats.get('total_length_km', 0):.2f} km ({stats.get('total_length_m', 0):.1f} m)</p>")
+        stats_html_lines.append(f"<p><strong>Average:</strong> {stats.get('avg_edge_length_m', 0):.1f} m</p>")
+        stats_html_lines.append(f"<p><strong>Min:</strong> {stats.get('min_edge_length_m', 0):.1f} m</p>")
+        stats_html_lines.append(f"<p><strong>Max:</strong> {stats.get('max_edge_length_m', 0):.1f} m</p>")
+        stats_html_lines.append('</div>')
+        stats_html = '\n'.join(stats_html_lines)
+
+        # Simple Cytoscape HTML template using CDN
+        json_basename = os.path.basename(json_filename)
+        # Use a placeholder template (not an f-string) to avoid brace-escaping issues
+        html_template = """
+    <!doctype html>
+    <html lang="es">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title><<<TITLE>>></title>
+        <style>
+            body { margin:0; font-family: Arial, Helvetica, sans-serif; }
+            #container { display:flex; height:100vh; }
+            #cy { flex:1; border-left:1px solid #ddd; }
+            #sidebar { width:320px; padding:16px; box-sizing:border-box; background:#f7f7f7; overflow:auto; }
+            h1,h2 { margin:8px 0; }
+            .stat-block p { margin:6px 0; }
+        </style>
+        <script src="https://unpkg.com/cytoscape@3.24.0/dist/cytoscape.min.js"></script>
+        <script src="https://unpkg.com/cytoscape-cose-bilkent@4.0.0/cytoscape-cose-bilkent.js"></script>
+    </head>
+    <body>
+        <div id="container">
+            <div id="sidebar">
+                <h1><<<TITLE>>></h1>
+                <<<STATS_HTML>>>
+                <p style="margin-top:12px; font-size:0.9em; color:#666;">Generado: <<<GEN_TIME>>></p>
+            </div>
+            <div id="cy"></div>
+        </div>
+
+        <script>
+            fetch('<<<JSON>>>')
+                .then(r => r.json())
+                .then(data => {
+                    const cy = cytoscape({
+                        container: document.getElementById('cy'),
+                        elements: data.elements,
+                        style: [
+                            { selector: 'node', style: { 'label': 'data(nombre)', 'background-color': 'data(color)', 'width': 'mapData(voltaje_kv, 0, 35, 20,40)', 'height': 'mapData(voltaje_kv, 0, 35, 20,40)', 'text-valign': 'center', 'color': '#fff', 'text-outline-width': 2, 'text-outline-color': '#333' } },
+                            { selector: "node[tipo != 'Subestacion']", style: { 'label': '' } },
+                            { selector: 'edge', style: { 'width': 'data(width)', 'line-color': 'data(color)', 'curve-style': 'bezier' } }
+                        ],
+                        layout: { name: 'cose-bilkent' }
+                    });
+                })
+                .catch(err => {
+                    document.getElementById('cy').innerText = 'Error cargando el grafo: ' + err;
+                });
+        </script>
+    </body>
+    </html>
+    """
+
+        gen_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        html_content = html_template.replace('<<<TITLE>>>', title).replace('<<<STATS_HTML>>>', stats_html).replace('<<<JSON>>>', json_basename).replace('<<<GEN_TIME>>>', gen_time)
+
+        # write files: ensure JSON is copied/moved in same output_dir so fetch path works
+        # (json already written by export_cytoscape_json into output_dir)
+        try:
+                with open(html_path, 'w', encoding='utf-8') as f:
+                        f.write(html_content)
+                print(f"✅ Cytoscape HTML viewer saved to: {html_path}")
+        except Exception as e:
+                print(f"⚠️ Error writing Cytoscape HTML: {e}")
+                html_path = ''
+
+        return html_path
 
 
 def generate_graph_statistics(G: nx.Graph) -> Dict:
@@ -521,6 +670,23 @@ def main(
         )
         
         result['output_file'] = output_path
+
+        # Export minimal graph data (nodes and edges) for diagramming
+        minimal_export = export_minimal_graph_data(G, output_dir)
+        result['minimal_export'] = minimal_export
+        # Export Cytoscape JSON and create HTML viewer
+        try:
+            cyto_json = export_cytoscape_json(G, output_dir)
+            result['cytoscape_json'] = cyto_json
+            if cyto_json:
+                cyto_html = create_cytoscape_html(output_dir, cyto_json, stats, title="Red Eléctrica - Cytoscape")
+                result['cytoscape_html'] = cyto_html
+            else:
+                result['cytoscape_html'] = None
+        except Exception as e:
+            result['cytoscape_json'] = None
+            result['cytoscape_html'] = None
+            print(f"⚠️ Error exporting Cytoscape files: {e}")
         result['success'] = True
         
         # Final summary
