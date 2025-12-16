@@ -606,7 +606,7 @@ def create_cytoscape_html(output_dir: str, json_filename: str, stats: Dict, titl
                         <h2>🎛️ Controles</h2>
                         <div class="control-group">
                             <button id="toggleLabels" class="btn btn-primary">
-                                🏷️ Mostrar/Ocultar Etiquetas
+                                🏷️ Mostrar Etiquetas
                             </button>
                         </div>
                         <div class="control-group">
@@ -720,6 +720,25 @@ def create_cytoscape_html(output_dir: str, json_filename: str, stats: Dict, titl
                                     'width': 'mapData(width, 1, 5, 3, 8)',
                                     'opacity': 1
                                 } 
+                            },
+                            { 
+                                selector: 'node.highlighted', 
+                                style: { 
+                                    'border-width': 4,
+                                    'border-color': '#4299e1',
+                                    'border-opacity': 1,
+                                    'background-color': 'data(color)',
+                                    'z-index': 999
+                                } 
+                            },
+                            { 
+                                selector: 'edge.highlighted', 
+                                style: { 
+                                    'line-color': '#4299e1',
+                                    'width': 'mapData(width, 1, 5, 3, 8)',
+                                    'opacity': 1,
+                                    'z-index': 999
+                                } 
                             }
                         ],
                         layout: { 
@@ -742,6 +761,7 @@ def create_cytoscape_html(output_dir: str, json_filename: str, stats: Dict, titl
                     });
                     
                     // Toggle labels button
+                    const toggleButton = document.getElementById('toggleLabels');
                     document.getElementById('toggleLabels').addEventListener('click', function() {
                         labelsVisible = !labelsVisible;
                         
@@ -750,6 +770,7 @@ def create_cytoscape_html(output_dir: str, json_filename: str, stats: Dict, titl
                                 .selector('node')
                                 .style('label', 'data(nombre)')
                                 .update();
+                            toggleButton.textContent = '🏷️ Ocultar Etiquetas';
                         } else {
                             cy.style()
                                 .selector('node[tipo != "Subestacion"]')
@@ -759,6 +780,7 @@ def create_cytoscape_html(output_dir: str, json_filename: str, stats: Dict, titl
                                 .selector('node[tipo = "Subestacion"]')
                                 .style('label', 'data(nombre)')
                                 .update();
+                            toggleButton.textContent = '🏷️ Mostrar Etiquetas';
                         }
                     });
                     
