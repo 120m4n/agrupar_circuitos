@@ -7,13 +7,62 @@
 ## ✨ Features
 
 - 🎨 **Interactive HTML Visualization**: Creates beautiful, interactive network graphs using Cytoscape.js library
+- 🏷️ **Conditional Label Toggle**: Show/hide all node labels with a single button click
 - 📊 **Graph Statistics**: Provides detailed statistics about the network (nodes, edges, connectivity, lengths)
 - 🎯 **Color-coded Nodes**: Different colors and sizes for different node types (Substation, Support, Derivation, Transformer)
 - 📏 **Smart Edge Display**: Edge thickness based on segment length
-- 🔍 **Interactive Controls**: Zoom, pan, and explore the network interactively
+- 🔍 **Interactive Controls**: 
+  - Toggle labels on/off conditionally
+  - Zoom In/Out buttons
+  - Reset zoom and fit to screen
+  - Pan and explore the network
+- 🎨 **Modern UI/UX**: Clean, professional design with smooth animations
+- 📱 **Responsive Design**: Optimized for desktop and mobile devices
+- 🖱️ **Interactive Highlighting**: Click nodes to highlight connections
 - 📁 **Independent Output**: Saves all files to a separate `graph_output/` directory
 - 🆓 **Open Source**: Uses free and open-source libraries (NetworkX, Cytoscape.js)
 - 🎯 **Optimal Layout**: Uses cose-bilkent layout algorithm, ideal for electrical network visualization
+
+## 🎨 UI/UX Improvements (v2.1)
+
+The latest version includes major UI/UX enhancements:
+
+### Modern Design
+- **Clean Interface**: Professional look with modern color scheme
+- **Gradient Backgrounds**: Subtle gradients for visual appeal
+- **Better Spacing**: Improved padding and margins throughout
+- **Card-Based Layout**: Statistics and controls in clean card containers
+- **Custom Scrollbar**: Styled scrollbar for the sidebar
+
+### Interactive Controls Panel
+- **🏷️ Label Toggle**: Single button to show/hide all node labels conditionally
+  - By default, only Subestación labels are shown
+  - Click to toggle all labels on/off
+- **🔍 Zoom Controls**: Four dedicated zoom buttons
+  - Acercar + (Zoom In)
+  - Alejar - (Zoom Out)
+  - Resetear (Reset to default zoom)
+  - Ajustar (Fit graph to screen)
+
+### Enhanced Statistics Display
+- **Organized Sections**: Statistics grouped into logical sections
+  - 🔢 Propiedades (Properties)
+  - 🏗️ Tipos de Nodos (Node Types)
+  - 📏 Longitudes (Lengths)
+- **Visual Hierarchy**: Clear labels and values with distinct styling
+- **Icons**: Emoji icons for better visual recognition
+
+### Color Legend
+- **Visual Guide**: Shows node type colors
+- **Circle Indicators**: Visual color swatches for each type
+- **Clear Labels**: Subestación, Derivación, Transformador, Apoyo
+
+### Graph Enhancements
+- **Smooth Animations**: Transitions on node/edge interactions
+- **Better Node Styling**: Enhanced borders and sizing
+- **Interactive Highlighting**: Click a node to highlight its connections
+- **Improved Edges**: Semi-transparent edges that highlight on selection
+- **Optimized Layout**: Better cose-bilkent parameters for clearer visualization
 
 ## 🚀 Installation
 
@@ -172,12 +221,20 @@ graph_output/
 The generated HTML file includes:
 
 - **Interactive Network Graph**: Pan and zoom to explore
-- **Zoom Controls**: Mouse wheel to zoom in/out
+- **Toggle Labels Button**: 🏷️ Show/hide all node labels conditionally with a single click
+- **Zoom Controls**: 
+  - 🔍 Mouse wheel to zoom in/out
+  - ➕ Zoom In button
+  - ➖ Zoom Out button
+  - 🔄 Reset Zoom button
+  - 📐 Fit to Screen button
 - **Pan**: Click and drag background to move around
 - **Force-Directed Layout**: Uses cose-bilkent algorithm optimized for hierarchical electrical networks
-- **Color-Coded Nodes**: Different colors for different node types
-- **Statistics Panel**: Side panel with detailed graph statistics
+- **Color-Coded Nodes**: Different colors for different node types with visual legend
+- **Statistics Panel**: Modern sidebar with detailed graph statistics
+- **Interactive Highlighting**: Click nodes to highlight connections
 - **Responsive Design**: Works on desktop and mobile browsers
+- **Modern UI/UX**: Clean, professional interface with smooth animations
 
 ## 🎨 Visualization Details
 
@@ -193,14 +250,16 @@ The generated HTML file includes:
   - Sized based on voltage level (higher voltage = larger node)
 
 - **Labels**:
-  - Substation: Name displayed
-  - Other nodes: No label (cleaner visualization)
+  - Substation: Name always displayed
+  - Other nodes: Labels hidden by default (cleaner visualization)
+  - Toggle Button: Show/hide all labels with the "🏷️ Mostrar/Ocultar Etiquetas" button
 
 ### Edge Representation
 
-- **Width**: Based on segment length
-- **Color**: Gray (#888888)
+- **Width**: Based on segment length (dynamically calculated)
+- **Color**: Neutral gray with transparency
 - **Style**: Bezier curves for smooth connections
+- **Interactive**: Highlighted when connected nodes are selected
 
 ### Layout Algorithm
 
