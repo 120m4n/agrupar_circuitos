@@ -2,18 +2,18 @@
 
 ## 📖 Overview
 
-`graph_visualizer.py` is an **independent standalone application** that generates interactive HTML visualizations of electrical network graphs from CSV data. This tool is completely separate from the main `agrupar_circuitos.py` functionality and does not interfere with the existing processing pipeline.
+`graph_visualizer.py` is an **independent standalone application** that generates interactive HTML visualizations of electrical network graphs from CSV data using **Cytoscape.js**. This tool is completely separate from the main `agrupar_circuitos.py` functionality and does not interfere with the existing processing pipeline.
 
 ## ✨ Features
 
-- 🎨 **Interactive HTML Visualization**: Creates beautiful, interactive network graphs using the Pyvis library
+- 🎨 **Interactive HTML Visualization**: Creates beautiful, interactive network graphs using Cytoscape.js library
 - 📊 **Graph Statistics**: Provides detailed statistics about the network (nodes, edges, connectivity, lengths)
 - 🎯 **Color-coded Nodes**: Different colors and sizes for different node types (Substation, Support, Derivation, Transformer)
-- 📏 **Smart Edge Display**: Edge thickness and color based on segment properties
-- 💡 **Hover Tooltips**: Detailed information on hover for nodes and edges
-- 🔍 **Interactive Controls**: Zoom, pan, drag nodes, and navigate through the network
+- 📏 **Smart Edge Display**: Edge thickness based on segment length
+- 🔍 **Interactive Controls**: Zoom, pan, and explore the network interactively
 - 📁 **Independent Output**: Saves all files to a separate `graph_output/` directory
-- 🆓 **Open Source**: Uses free and open-source libraries (NetworkX, Pyvis)
+- 🆓 **Open Source**: Uses free and open-source libraries (NetworkX, Cytoscape.js)
+- 🎯 **Optimal Layout**: Uses cose-bilkent layout algorithm, ideal for electrical network visualization
 
 ## 🚀 Installation
 
@@ -21,13 +21,14 @@
 
 - Python 3.8 or higher
 - pip (Python package installer)
+- Modern web browser (Chrome, Firefox, Edge, Safari)
 
 ### Required Libraries
 
 Install the required libraries using pip:
 
 ```bash
-pip install pandas networkx pyvis
+pip install pandas networkx
 ```
 
 Or if you have a requirements file:
@@ -57,8 +58,8 @@ python graph_visualizer.py
 This will:
 1. Look for CSV files in the `./data` directory
 2. Create a NetworkX graph from the data
-3. Generate an interactive HTML visualization
-4. Save the output to `./graph_output/red_electrica_graph.html`
+3. Generate an interactive HTML visualization using Cytoscape.js
+4. Save the output to `./graph_output/red_electrica_cytoscape.html`
 
 ### Using Example Data
 
@@ -78,12 +79,12 @@ Specify a custom directory containing your CSV files:
 python graph_visualizer.py --input-dir /path/to/your/csv/files
 ```
 
-### Custom Output Directory and Filename
+### Custom Output Directory
 
-Save the visualization to a specific location with a custom name:
+Save the visualization to a specific location:
 
 ```bash
-python graph_visualizer.py --output-dir ./my_visualizations --output-file my_network.html
+python graph_visualizer.py --output-dir ./my_visualizations
 ```
 
 ### Full Custom Example
@@ -91,8 +92,7 @@ python graph_visualizer.py --output-dir ./my_visualizations --output-file my_net
 ```bash
 python graph_visualizer.py \
   --input-dir ./data \
-  --output-dir ./graphs/2024 \
-  --output-file network_dec_2024.html
+  --output-dir ./graphs/2024
 ```
 
 ## 📁 Input Files
@@ -146,30 +146,38 @@ id_segmento,id_circuito,nodo_inicio,nodo_fin,longitud_m,tipo_conductor,capacidad
 
 The visualizer creates the following output in the `graph_output/` directory:
 
-1. **`red_electrica_graph.html`** (or custom filename)
-   - Interactive HTML visualization
+1. **`red_electrica_cytoscape.html`**
+   - Interactive HTML visualization using Cytoscape.js
    - Can be opened in any modern web browser
-   - No internet connection required after generation
+   - No internet connection required after generation (uses CDN)
+   
+2. **`graph_cytoscape.json`**
+   - JSON file with graph data in Cytoscape format
+   
+3. **`graph_nodes_minimal.csv` and `graph_edges_minimal.csv`**
+   - Minimal CSV files for external use
 
 ### Output Directory Structure
 
 ```
 graph_output/
-└── red_electrica_graph.html    # Interactive visualization
+├── red_electrica_cytoscape.html    # Interactive Cytoscape visualization
+├── graph_cytoscape.json            # Graph data in Cytoscape format
+├── graph_nodes_minimal.csv         # Minimal node data
+└── graph_edges_minimal.csv         # Minimal edge data
 ```
 
 ### HTML Visualization Features
 
 The generated HTML file includes:
 
-- **Interactive Network Graph**: Click and drag nodes to rearrange
-- **Zoom Controls**: Mouse wheel or pinch to zoom in/out
+- **Interactive Network Graph**: Pan and zoom to explore
+- **Zoom Controls**: Mouse wheel to zoom in/out
 - **Pan**: Click and drag background to move around
-- **Node Tooltips**: Hover over nodes to see detailed information
-- **Edge Tooltips**: Hover over edges to see segment details
-- **Navigation Buttons**: Built-in controls for easy navigation
-- **Legend**: Color legend for different node types
-- **Statistics Header**: Summary of network statistics
+- **Force-Directed Layout**: Uses cose-bilkent algorithm optimized for hierarchical electrical networks
+- **Color-Coded Nodes**: Different colors for different node types
+- **Statistics Panel**: Side panel with detailed graph statistics
+- **Responsive Design**: Works on desktop and mobile browsers
 
 ## 🎨 Visualization Details
 
@@ -182,23 +190,27 @@ The generated HTML file includes:
   - 🔵 Blue: Support/Pole (Apoyo)
 
 - **Sizes**:
-  - Substation: Largest (35px)
-  - Derivation/Transformer: Medium (25px)
-  - Support: Small (15px)
+  - Sized based on voltage level (higher voltage = larger node)
 
 - **Labels**:
-  - Substation: 🏭 + Name
-  - Transformer: ⚡ + ID
-  - Derivation: ⚪ + ID
-  - Support: ID only
+  - Substation: Name displayed
+  - Other nodes: No label (cleaner visualization)
 
 ### Edge Representation
 
-- **Width**: Based on segment length (shorter segments = thicker lines)
-- **Color**: Based on conductor type
-  - AAC_150: Dodger Blue
-  - AAC_95: Orange
-  - Other: Gray
+- **Width**: Based on segment length
+- **Color**: Gray (#888888)
+- **Style**: Bezier curves for smooth connections
+
+### Layout Algorithm
+
+The visualization uses the **cose-bilkent** layout algorithm, which is specifically designed for:
+- Hierarchical structures (like electrical distribution networks)
+- Force-directed positioning with quality results
+- Automatic node placement that minimizes edge crossings
+- Clear visualization of tree-like structures with branches
+
+This layout is ideal for electrical networks as it naturally shows the hierarchical flow from substation through the distribution network.
 
 ## 📊 Statistics Output
 
@@ -242,7 +254,6 @@ import graph_visualizer
 result = graph_visualizer.main(
     input_dir='./data',
     output_dir='./my_graphs',
-    output_filename='network.html',
     use_example_data=False
 )
 
@@ -256,7 +267,8 @@ else:
 df_nodos, df_segmentos = graph_visualizer.load_csv_data('./data')
 G = graph_visualizer.create_networkx_graph(df_nodos, df_segmentos)
 stats = graph_visualizer.generate_graph_statistics(G)
-graph_visualizer.create_html_visualization(G, './output/graph.html')
+cyto_json = graph_visualizer.export_cytoscape_json(G, './output')
+cyto_html = graph_visualizer.create_cytoscape_html('./output', cyto_json, stats)
 ```
 
 ### Integration with Existing Pipeline
@@ -302,7 +314,6 @@ print(f"Visualization: {result2['output_file']}")
 |--------|-------|---------|-------------|
 | `--input-dir` | - | `./data` | Directory containing CSV files |
 | `--output-dir` | - | `./graph_output` | Directory to save output files |
-| `--output-file` | - | `red_electrica_graph.html` | Name of output HTML file |
 | `--example` | - | False | Use example data instead of CSV files |
 | `--help` | `-h` | - | Show help message |
 
@@ -332,11 +343,11 @@ The generated HTML works best with modern browsers:
 
 ## 🐛 Troubleshooting
 
-### Problem: "ModuleNotFoundError: No module named 'pyvis'"
+### Problem: "ModuleNotFoundError: No module named 'pandas'" or similar
 
-**Solution**: Install pyvis library
+**Solution**: Install required libraries
 ```bash
-pip install pyvis
+pip install pandas networkx
 ```
 
 ### Problem: "File not found" error
@@ -361,7 +372,7 @@ python graph_visualizer.py --example
 
 - **pandas**: Data manipulation and CSV reading
 - **networkx**: Graph creation and analysis
-- **pyvis**: Interactive network visualization
+- **Cytoscape.js**: Interactive network visualization (loaded via CDN in HTML)
 
 ## 🔐 Security
 
@@ -378,7 +389,7 @@ This tool is part of the agrupar_circuitos project. See the main project for lic
 
 - **Roman Sarmiento**
 - Date: 2025-12-16
-- Version: 1.0
+- Version: 2.0 (Cytoscape.js implementation)
 
 ## 🤝 Contributing
 

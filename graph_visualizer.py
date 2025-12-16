@@ -9,13 +9,13 @@ network graphs from CSV data (nodes and segments).
 Features:
 - Reads CSV data (nodos_circuito.csv, segmentos_circuito.csv)
 - Creates NetworkX graph
-- Generates interactive HTML visualization using pyvis
+- Generates interactive HTML visualization using Cytoscape.js
 - Saves output to independent graph_output/ directory
 - Does not interfere with existing agrupar_circuitos.py functionality
 
 Author: Roman Sarmiento
 Date: 2025-12-16
-Version: 1.0
+Version: 2.0
 """
 
 import pandas as pd
@@ -195,154 +195,6 @@ def get_node_size(node_type: str) -> int:
         'Apoyo': 15,
     }
     return size_map.get(node_type, 15)
-
-
-def create_html_visualization(
-    G: nx.Graph,
-    output_path: str,
-    title: str = "Red Eléctrica - Visualización Interactiva",
-    height: str = "750px",
-    width: str = "100%",
-    notebook: bool = False
-) -> str:
-    """
-    Create an interactive HTML visualization using pyvis.
-    
-    Args:
-        G: NetworkX graph
-        output_path: Path to save the HTML file
-        title: Title for the visualization
-        height: Height of the visualization
-        width: Width of the visualization
-        notebook: Whether to use notebook mode
-        
-    Returns:
-        Path to the generated HTML file
-    """
-    try:
-        from pyvis.network import Network
-    except ImportError:
-        print("❌ ERROR: pyvis library is not installed.")
-        print("   Install it with: pip install pyvis")
-        raise
-    
-    print(f"\n🎨 Creating interactive HTML visualization...")
-    
-    # Create pyvis network
-    net = Network(
-        height=height,
-        width=width,
-        bgcolor='#FFFFFF',
-        font_color='#000000',
-        notebook=notebook,
-        directed=False
-    )
-    
-    # Use simplified options: no physics, hierarchical layout for branch clarity
-    net.set_options("""
-    {
-        "nodes": {
-            "font": {
-                "size": 12
-            },
-            "borderWidth": 2,
-            "borderWidthSelected": 4
-        },
-        "edges": {
-            "color": {
-                "inherit": true
-            },
-            "smooth": {
-                "enabled": false
-            }
-        },
-        "layout": {
-            "hierarchical": {
-                "enabled": true,
-                "direction": "UD",
-                "sortMethod": "directed"
-            }
-        },
-        "interaction": {
-            "hover": false,
-            "navigationButtons": true,
-            "keyboard": true
-        }
-    }
-    """)
-    
-    # Add nodes with simplified attributes
-    DEFAULT_NODE_COLOR = '#6C757D'  # muted gray for regular nodes
-    DEFAULT_NODE_SIZE = 15
-    DEFAULT_NODE_SHAPE = 'dot'
-    SUBSTATION_COLOR = '#FF0000'
-    SUBSTATION_SIZE = 36
-    SUBSTATION_SHAPE = 'triangle'
-
-    for node_id in G.nodes():
-        node_data = G.nodes[node_id]
-
-        is_substation = node_data.get('tipo') == 'Subestacion'
-
-        # Only substation keeps a visible label (its name). Others are uniform and unlabeled.
-        label = node_data.get('nombre') if is_substation else ''
-
-        net.add_node(
-            node_id,
-            label=label,
-            title=None,
-            color=(SUBSTATION_COLOR if is_substation else DEFAULT_NODE_COLOR),
-            size=(SUBSTATION_SIZE if is_substation else DEFAULT_NODE_SIZE),
-            shape=(SUBSTATION_SHAPE if is_substation else DEFAULT_NODE_SHAPE),
-            borderWidth=2,
-            borderWidthSelected=4
-        )
-    
-    # Add edges with minimal attributes (no tooltips, fixed style)
-    EDGE_COLOR = '#888888'
-    EDGE_WIDTH = 2
-
-    for u, v, data in G.edges(data=True):
-        net.add_edge(
-            u, v,
-            title=None,
-            width=EDGE_WIDTH,
-            color=EDGE_COLOR
-        )
-    
-    # Add title to the visualization
-    html_title = f"""
-    <div style="text-align: center; padding: 20px; background-color: #f0f0f0; border-bottom: 2px solid #ccc;">
-        <h1 style="margin: 0; color: #333;">{title}</h1>
-        <p style="margin: 5px 0; color: #666;">
-            Nodos: {G.number_of_nodes()} | Segmentos: {G.number_of_edges()} | 
-            Generado: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-        </p>
-        <div style="margin-top: 10px; font-size: 14px;">
-            <span style="color: #FF0000;">■</span> Subestación &nbsp;
-            <span style="color: #FFD700;">■</span> Derivación &nbsp;
-            <span style="color: #32CD32;">■</span> Transformador &nbsp;
-            <span style="color: #4169E1;">■</span> Apoyo
-        </div>
-    </div>
-    """
-    
-    # Save the network
-    net.save_graph(output_path)
-    
-    # Add custom title by modifying the HTML file
-    with open(output_path, 'r', encoding='utf-8') as f:
-        html_content = f.read()
-    
-    # Insert title after body tag
-    html_content = html_content.replace('<body>', f'<body>\n{html_title}')
-    
-    with open(output_path, 'w', encoding='utf-8') as f:
-        f.write(html_content)
-    
-    print(f"✅ HTML visualization saved to: {output_path}")
-    
-    return output_path
 
 
 def export_minimal_graph_data(G: nx.Graph, output_dir: str) -> dict:
@@ -611,16 +463,16 @@ def print_graph_statistics(stats: Dict):
 def main(
     input_dir: str = './data',
     output_dir: str = './graph_output',
-    output_filename: str = 'red_electrica_graph.html',
+    output_filename: str = 'red_electrica_cytoscape.html',
     use_example_data: bool = False
 ) -> Dict:
     """
-    Main function to generate graph visualization.
+    Main function to generate graph visualization using Cytoscape.js.
     
     Args:
         input_dir: Directory containing CSV files
         output_dir: Directory to save output files
-        output_filename: Name of the output HTML file
+        output_filename: Name of the output HTML file (ignored, uses cytoscape naming)
         use_example_data: If True, use example data instead of CSV files
         
     Returns:
@@ -635,11 +487,10 @@ def main(
     
     try:
         print("=" * 70)
-        print("GRAPH VISUALIZER - Interactive HTML Network Visualization")
+        print("GRAPH VISUALIZER - Interactive HTML Network Visualization (Cytoscape.js)")
         print("=" * 70)
         print(f"Input directory: {input_dir}")
         print(f"Output directory: {output_dir}")
-        print(f"Output filename: {output_filename}")
         
         # Create output directory if it doesn't exist
         os.makedirs(output_dir, exist_ok=True)
@@ -661,39 +512,28 @@ def main(
         print_graph_statistics(stats)
         result['stats'] = stats
         
-        # Create HTML visualization
-        output_path = os.path.join(output_dir, output_filename)
-        create_html_visualization(
-            G,
-            output_path,
-            title="Red Eléctrica - Visualización Interactiva"
-        )
-        
-        result['output_file'] = output_path
-
         # Export minimal graph data (nodes and edges) for diagramming
         minimal_export = export_minimal_graph_data(G, output_dir)
         result['minimal_export'] = minimal_export
+        
         # Export Cytoscape JSON and create HTML viewer
-        try:
-            cyto_json = export_cytoscape_json(G, output_dir)
-            result['cytoscape_json'] = cyto_json
-            if cyto_json:
-                cyto_html = create_cytoscape_html(output_dir, cyto_json, stats, title="Red Eléctrica - Cytoscape")
-                result['cytoscape_html'] = cyto_html
-            else:
-                result['cytoscape_html'] = None
-        except Exception as e:
-            result['cytoscape_json'] = None
+        cyto_json = export_cytoscape_json(G, output_dir)
+        result['cytoscape_json'] = cyto_json
+        if cyto_json:
+            cyto_html = create_cytoscape_html(output_dir, cyto_json, stats, title="Red Eléctrica - Cytoscape")
+            result['cytoscape_html'] = cyto_html
+            result['output_file'] = cyto_html
+        else:
             result['cytoscape_html'] = None
-            print(f"⚠️ Error exporting Cytoscape files: {e}")
+            print(f"⚠️ Error exporting Cytoscape files")
+            
         result['success'] = True
         
         # Final summary
         print("\n" + "=" * 70)
         print("✅ VISUALIZATION COMPLETED SUCCESSFULLY")
         print("=" * 70)
-        print(f"\n📁 Output file: {output_path}")
+        print(f"\n📁 Output file: {result['output_file']}")
         print(f"📊 Graph: {stats['num_nodes']} nodes, {stats['num_edges']} edges")
         print(f"📏 Total network length: {stats['total_length_km']:.2f} km")
         print(f"\n💡 Open the HTML file in your web browser to view the interactive visualization!")
@@ -711,7 +551,7 @@ def main(
 def parse_arguments():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description='Generate interactive HTML visualization of electrical network graph',
+        description='Generate interactive HTML visualization of electrical network graph using Cytoscape.js',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -721,20 +561,20 @@ Examples:
   # Specify custom input directory
   python graph_visualizer.py --input-dir /path/to/csv/files
   
-  # Specify custom output directory and filename
-  python graph_visualizer.py --output-dir ./my_graphs --output-file my_graph.html
+  # Specify custom output directory
+  python graph_visualizer.py --output-dir ./my_graphs
   
   # Use example data (ignore CSV files)
   python graph_visualizer.py --example
   
   # Full custom example
-  python graph_visualizer.py --input-dir ./data --output-dir ./graphs --output-file network_2024.html
+  python graph_visualizer.py --input-dir ./data --output-dir ./graphs
 
 Notes:
   - This tool is independent and does not modify existing agrupar_circuitos.py functionality
   - CSV files expected: nodos_circuito.csv, segmentos_circuito.csv
   - Output is saved in the graph_output/ directory by default
-  - Requires pyvis library: pip install pyvis
+  - Uses Cytoscape.js for interactive visualization with cose-bilkent layout
         """
     )
     
@@ -755,8 +595,8 @@ Notes:
     parser.add_argument(
         '--output-file',
         type=str,
-        default='red_electrica_graph.html',
-        help='Name of output HTML file (default: red_electrica_graph.html)'
+        default='red_electrica_cytoscape.html',
+        help='Name of output HTML file (default: red_electrica_cytoscape.html)'
     )
     
     parser.add_argument(

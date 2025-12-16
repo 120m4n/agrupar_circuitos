@@ -20,6 +20,7 @@ El proyecto está organizado en cuatro módulos principales que pueden funcionar
    - ✅ Modo standalone: `python graph_visualizer.py --example`
    - ✅ Modo librería: `import graph_visualizer; graph_visualizer.main(...)`
    - 📖 [Ver documentación completa](README_graph_visualizer.md)
+   - 🎨 Usa Cytoscape.js con layout cose-bilkent optimizado para redes eléctricas
 
 4. **`main.py`** - Pipeline integrado completo (Oracle → Agrupación)
    - ✅ Modo standalone solamente: `python main.py --circuito "12 0m4n"`
@@ -356,12 +357,13 @@ El proyecto ahora incluye una **herramienta independiente de visualización** qu
 ### Características de Graph Visualizer
 
 - 🎯 **Totalmente Independiente**: No interfiere con el proceso de agrupación existente
-- 🎨 **Visualización Interactiva**: Usa Pyvis para crear gráficos HTML navegables
-- 🔍 **Información Detallada**: Tooltips con información de nodos y segmentos
+- 🎨 **Visualización Interactiva**: Usa Cytoscape.js para crear gráficos HTML navegables
+- 🔍 **Información Detallada**: Panel lateral con estadísticas completas del grafo
 - 🎨 **Código de Colores**: Diferentes colores para tipos de nodos (Subestación, Apoyo, Transformador, Derivación)
 - 📊 **Estadísticas del Grafo**: Muestra propiedades topológicas y métricas de la red
 - 📁 **Salida Separada**: Guarda archivos en directorio `graph_output/` independiente
-- 🆓 **Open Source**: Usa bibliotecas libres (NetworkX, Pyvis)
+- 🆓 **Open Source**: Usa bibliotecas libres (NetworkX, Cytoscape.js)
+- 🎯 **Layout Optimizado**: Usa algoritmo cose-bilkent, ideal para redes eléctricas jerárquicas
 
 ### Uso Rápido
 
@@ -376,7 +378,7 @@ python graph_visualizer.py --example
 python graph_visualizer.py --input-dir ./data
 
 # Personalizar salida
-python graph_visualizer.py --output-dir ./mis_grafos --output-file red_2024.html
+python graph_visualizer.py --output-dir ./mis_grafos
 ```
 
 ### Documentación Completa
