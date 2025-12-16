@@ -26,6 +26,11 @@ import argparse
 from typing import Tuple, Dict, Optional
 from datetime import datetime
 
+# Constants for visualization
+EDGE_WIDTH_SCALE_FACTOR = 1000  # Scale factor for calculating edge width based on length
+MIN_EDGE_WIDTH = 1
+MAX_EDGE_WIDTH = 5
+
 
 def create_example_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
@@ -81,26 +86,33 @@ def load_csv_data(input_dir: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
     nodes_path = os.path.join(input_dir, 'nodos_circuito.csv')
     segments_path = os.path.join(input_dir, 'segmentos_circuito.csv')
     
-    # Try to load existing CSV files
+    # Check if both files exist
+    files_exist = os.path.exists(nodes_path) and os.path.exists(segments_path)
+    
+    if not files_exist:
+        missing_files = []
+        if not os.path.exists(nodes_path):
+            missing_files.append(nodes_path)
+        if not os.path.exists(segments_path):
+            missing_files.append(segments_path)
+        
+        print(f"⚠️  File(s) not found: {', '.join(missing_files)}")
+        print("   Creating example data...")
+        return create_example_data()
+    
+    # Load CSV files
     try:
         df_nodos = pd.read_csv(nodes_path)
         print(f"✅ Loaded {len(df_nodos)} nodes from {nodes_path}")
-    except FileNotFoundError:
-        print(f"⚠️  File not found: {nodes_path}")
-        print("   Creating example data...")
-        df_nodos, df_segmentos = create_example_data()
-        return df_nodos, df_segmentos
-    
-    try:
+        
         df_segmentos = pd.read_csv(segments_path)
         print(f"✅ Loaded {len(df_segmentos)} segments from {segments_path}")
-    except FileNotFoundError:
-        print(f"⚠️  File not found: {segments_path}")
-        print("   Creating example data...")
-        df_nodos, df_segmentos = create_example_data()
+        
         return df_nodos, df_segmentos
-    
-    return df_nodos, df_segmentos
+    except Exception as e:
+        print(f"⚠️  Error loading CSV files: {e}")
+        print("   Creating example data...")
+        return create_example_data()
 
 
 def create_networkx_graph(df_nodos: pd.DataFrame, df_segmentos: pd.DataFrame) -> nx.Graph:
@@ -319,7 +331,8 @@ def create_html_visualization(
         )
         
         # Edge width based on length (shorter = thicker)
-        width = max(1, min(5, 1000 / data['longitud_m']))
+        # Uses scale factor to normalize width between min and max
+        width = max(MIN_EDGE_WIDTH, min(MAX_EDGE_WIDTH, EDGE_WIDTH_SCALE_FACTOR / data['longitud_m']))
         
         # Edge color based on conductor type
         if data['tipo_conductor'].startswith('AAC_150'):
