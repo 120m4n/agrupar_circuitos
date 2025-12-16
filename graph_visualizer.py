@@ -476,7 +476,6 @@ def print_graph_statistics(stats: Dict):
 def main(
     input_dir: str = './data',
     output_dir: str = './graph_output',
-    output_filename: str = 'red_electrica_cytoscape.html',
     use_example_data: bool = False
 ) -> Dict:
     """
@@ -485,11 +484,16 @@ def main(
     Args:
         input_dir: Directory containing CSV files
         output_dir: Directory to save output files
-        output_filename: Name of the output HTML file (ignored, uses cytoscape naming)
         use_example_data: If True, use example data instead of CSV files
         
     Returns:
-        Dictionary with execution results
+        Dictionary with execution results including:
+        - success: Boolean indicating if visualization was created
+        - output_file: Path to generated HTML file
+        - cytoscape_json: Path to JSON data file
+        - minimal_export: Dict with paths to minimal CSV files
+        - stats: Graph statistics dictionary
+        - error: Error message if success is False
     """
     result = {
         'success': False,
@@ -530,15 +534,22 @@ def main(
         result['minimal_export'] = minimal_export
         
         # Export Cytoscape JSON and create HTML viewer
-        cyto_json = export_cytoscape_json(G, output_dir)
-        result['cytoscape_json'] = cyto_json
-        if cyto_json:
-            cyto_html = create_cytoscape_html(output_dir, cyto_json, stats, title="Red Eléctrica - Cytoscape")
-            result['cytoscape_html'] = cyto_html
-            result['output_file'] = cyto_html
-        else:
-            result['cytoscape_html'] = None
-            print(f"⚠️ Error exporting Cytoscape files")
+        try:
+            cyto_json = export_cytoscape_json(G, output_dir)
+            result['cytoscape_json'] = cyto_json
+            if cyto_json:
+                cyto_html = create_cytoscape_html(output_dir, cyto_json, stats, title="Red Eléctrica - Cytoscape")
+                result['cytoscape_html'] = cyto_html
+                result['output_file'] = cyto_html
+            else:
+                result['cytoscape_html'] = None
+                result['error'] = "Failed to export Cytoscape JSON file"
+                print(f"⚠️ Error: Failed to export Cytoscape JSON file")
+                return result
+        except Exception as e:
+            result['error'] = f"Failed to create Cytoscape visualization: {str(e)}"
+            print(f"⚠️ Error creating Cytoscape visualization: {str(e)}")
+            return result
             
         result['success'] = True
         
@@ -588,6 +599,7 @@ Notes:
   - CSV files expected: nodos_circuito.csv, segmentos_circuito.csv
   - Output is saved in the graph_output/ directory by default
   - Uses Cytoscape.js for interactive visualization with cose-bilkent layout
+  - Output filename is always: red_electrica_cytoscape.html
         """
     )
     
@@ -603,13 +615,6 @@ Notes:
         type=str,
         default='./graph_output',
         help='Directory to save output files (default: ./graph_output)'
-    )
-    
-    parser.add_argument(
-        '--output-file',
-        type=str,
-        default='red_electrica_cytoscape.html',
-        help='Name of output HTML file (default: red_electrica_cytoscape.html)'
     )
     
     parser.add_argument(
@@ -629,7 +634,6 @@ if __name__ == "__main__":
     result = main(
         input_dir=args.input_dir,
         output_dir=args.output_dir,
-        output_filename=args.output_file,
         use_example_data=args.example
     )
     
