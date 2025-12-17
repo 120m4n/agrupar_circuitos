@@ -640,8 +640,6 @@ def create_cytoscape_html(output_dir: str, json_filename: str, stats: Dict, titl
         </style>
         <script src="https://unpkg.com/cytoscape@3.24.0/dist/cytoscape.min.js"></script>
         <script src="https://unpkg.com/cytoscape-cose-bilkent@4.0.0/cytoscape-cose-bilkent.js"></script>
-        <script src="https://unpkg.com/dagre@0.8.5/dist/dagre.js"></script>
-        <script src="https://unpkg.com/cytoscape-dagre@2.3.2/cytoscape-dagre.js"></script>
     </head>
     <body>
         <div id="container">
@@ -661,7 +659,6 @@ def create_cytoscape_html(output_dir: str, json_filename: str, stats: Dict, titl
                             <label>📐 Layout</label>
                             <select id="layoutSelect" class="layout-select">
                                 <option value="cose-bilkent">COSe Bilkent (Jerárquico)</option>
-                                <option value="dagre">Dagre (Jerárquico)</option>
                                 <option value="breadthfirst">Breadth First (Árbol)</option>
                             </select>
                         </div>
@@ -830,13 +827,6 @@ def create_cytoscape_html(output_dir: str, json_filename: str, stats: Dict, titl
                                 roots: '[tipo = "Subestacion"]', // Inicia desde subestación
                                 spacingFactor: 1.5,
                                 avoidOverlap: true
-                            };
-                        } else if (newLayout === 'dagre') {
-                            layoutConfig = {
-                                name: 'dagre',
-                                animate: true,
-                                animationDuration: 500,
-                                rankDir: 'TB' // Top to Bottom (vertical)
                             };
                         }
                         

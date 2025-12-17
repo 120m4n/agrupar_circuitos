@@ -779,6 +779,45 @@ def transform_lines(df_raw: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def identify_orphan_nodes(
+    df_nodes: pd.DataFrame,
+    df_lines: pd.DataFrame
+) -> pd.DataFrame:
+    """
+    Identifica nodos huérfanos que no están referenciados en ningún segmento.
+    
+    Un nodo huérfano es aquel que existe en la tabla de nodos pero no aparece
+    como nodo_inicio ni nodo_fin en ningún segmento.
+    
+    Args:
+        df_nodes: DataFrame de nodos
+        df_lines: DataFrame de líneas
+        
+    Returns:
+        DataFrame con los nodos huérfanos
+    """
+    # Get all node IDs referenced in segments
+    node_ids_in_segments = set()
+    node_ids_in_segments.update(df_lines['nodo_inicio'].astype(str).unique())
+    node_ids_in_segments.update(df_lines['nodo_fin'].astype(str).unique())
+    
+    # Get all node IDs from nodes table
+    all_node_ids = set(df_nodes['id_nodo'].astype(str).unique())
+    
+    # Find orphan nodes (nodes not referenced in any segment)
+    orphan_node_ids = all_node_ids - node_ids_in_segments
+    
+    # Filter orphan nodes
+    df_orphans = df_nodes[df_nodes['id_nodo'].astype(str).isin(orphan_node_ids)].copy()
+    
+    if len(df_orphans) > 0:
+        logging.info(f"[ADVERTENCIA] Se encontraron {len(df_orphans)} nodos huérfanos (no referenciados en ningún segmento)")
+    else:
+        logging.info("[OK] No se encontraron nodos huérfanos")
+    
+    return df_orphans
+
+
 def validate_data_integrity(
     df_nodes: pd.DataFrame,
     df_lines: pd.DataFrame
@@ -875,6 +914,36 @@ def write_csv(
         
     except Exception as e:
         raise CSVWriteError(f"Error al escribir CSV {filename}: {e}")
+
+
+def write_orphan_nodes(
+    df_orphans: pd.DataFrame,
+    config: Dict[str, Any]
+) -> str:
+    """
+    Escribe los nodos huérfanos a un archivo CSV separado.
+    
+    Args:
+        df_orphans: DataFrame con nodos huérfanos
+        config: Configuración con rutas de salida
+        
+    Returns:
+        Ruta del archivo generado o None si no hay nodos huérfanos
+    """
+    if len(df_orphans) == 0:
+        logging.info("No hay nodos huérfanos para exportar")
+        return None
+    
+    output_config = config['OUTPUT']
+    output_dir = output_config.get('output_dir', './')
+    encoding = output_config.get('encoding', 'utf-8')
+    
+    # Generate orphan nodes filename
+    orphan_filename = 'nodos_huerfanos.csv'
+    orphan_path = write_csv(df_orphans, orphan_filename, output_dir, encoding)
+    
+    logging.info(f"[OK] {len(df_orphans)} nodos huérfanos exportados a {orphan_filename}")
+    return orphan_path
 
 
 def generate_csv_files(
@@ -1087,9 +1156,31 @@ def oracle_to_csv_pipeline(config_file: str = "Connect.ini", circuito: str = Non
             result['errors'].extend(errors)
             raise DataValidationError(f"Errores de validación: {errors}")
         
+        # 5.1. Identificar y procesar nodos huérfanos
+        logging.info("Identificando nodos huérfanos...")
+        df_orphans = identify_orphan_nodes(df_nodes, df_lines)
+        orphan_count = len(df_orphans)
+        
+        # 5.2. Exportar nodos huérfanos si existen
+        orphan_file = None
+        if orphan_count > 0:
+            logging.info(f"Exportando {orphan_count} nodos huérfanos...")
+            orphan_file = write_orphan_nodes(df_orphans, config)
+        
+        # 5.3. Filtrar nodos huérfanos del DataFrame principal
+        if orphan_count > 0:
+            orphan_ids = set(df_orphans['id_nodo'].astype(str))
+            df_nodes = df_nodes[~df_nodes['id_nodo'].astype(str).isin(orphan_ids)].copy()
+            logging.info(f"[OK] {orphan_count} nodos huérfanos eliminados del archivo de nodos principal")
+            logging.info(f"[OK] {len(df_nodes)} nodos válidos (conectados) serán exportados")
+        
         # 6. Generar CSV
         logging.info("Generando archivos CSV...")
         files = generate_csv_files(df_nodes, df_lines, config)
+        
+        # Add orphan file to results if it exists
+        if orphan_file:
+            files['orphans'] = orphan_file
         
         # 7. Verificar formato
         expected_node_cols = ['id_nodo', 'nombre', 'tipo', 'voltaje_kv', 'x', 'y']
@@ -1107,12 +1198,14 @@ def oracle_to_csv_pipeline(config_file: str = "Connect.ini", circuito: str = Non
         result['stats'] = {
             'nodes_count': len(df_nodes),
             'lines_count': len(df_lines),
+            'orphan_nodes_count': orphan_count,
             'execution_time': time.time() - start_time
         }
         
         logging.info("=" * 70)
         logging.info("PROCESO COMPLETADO EXITOSAMENTE")
-        logging.info(f"Nodos: {result['stats']['nodes_count']}")
+        logging.info(f"Nodos válidos (conectados): {result['stats']['nodes_count']}")
+        logging.info(f"Nodos huérfanos (desconectados): {result['stats']['orphan_nodes_count']}")
         logging.info(f"Segmentos: {result['stats']['lines_count']}")
         logging.info(f"Tiempo: {result['stats']['execution_time']:.2f}s")
         logging.info("=" * 70)
