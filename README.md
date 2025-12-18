@@ -48,10 +48,10 @@ flowchart LR
   - Ingesta de datos desde archivos CSV (`segmentos_circuito.csv`, `nodos_circuito.csv`). Genera datos de prueba si no existen.
   - **🆕 Exportación desde Oracle**: Funcionalidad documentada para generar CSV desde base de datos Oracle (ver [Documentación Oracle](#-exportación-desde-oracle)).
 - **Modelado de Red**: Construcción de un grafo no dirigido ponderado utilizando `NetworkX`.
-- **Agrupación Inteligente**: 
-  - Utiliza un recorrido DFS para recorrer la red desde la subestación.
-  - Agrupa segmentos contiguos hasta completar ~1 km (configurable).
-  - Maneja tolerancias y ramificaciones.
+- **🆕 Dos Algoritmos de Agrupación**: 
+  - **Algoritmo Lineal (DFS Secuencial)**: Recorre la red de forma secuencial y agrupa segmentos contiguos hasta completar ~1 km.
+  - **Algoritmo Por Ramas**: Identifica primero las ramas de la red y agrupa segmentos dentro de cada rama independientemente.
+  - Opción para ejecutar ambos algoritmos y comparar resultados.
 - **Análisis y Estadísticas**: Calcula métricas de los grupos formados (min, max, promedio, desviación estándar).
 - **Exportación GIS**: Genera archivos GeoJSON/Gpkg para integración con sistemas GIS (QGIS, ArcGIS).
 
@@ -114,18 +114,28 @@ El script acepta los siguientes parámetros de línea de comandos:
 
 - `--input-dir`: Directorio de entrada para archivos CSV (default: `./data`)
 - `--output-dir`: Directorio de salida para archivos generados (default: `./data`)
+- `--algoritmo`: Algoritmo de agrupación a usar (default: `lineal`)
+  - `lineal`: DFS secuencial (algoritmo original)
+  - `por-ramas`: DFS agrupando por ramas
+  - `ambos`: Ejecuta ambos y compara resultados
 
 ### Ejemplos de Uso
 
 ```bash
-# Usar directorios por defecto (./data)
+# Usar directorios por defecto con algoritmo lineal (default)
 python agrupar_circuitos.py
 
+# Usar algoritmo por ramas
+python agrupar_circuitos.py --algoritmo por-ramas
+
+# Comparar ambos algoritmos
+python agrupar_circuitos.py --algoritmo ambos
+
 # Especificar directorio de entrada personalizado
-python agrupar_circuitos.py --input-dir /ruta/a/datos/entrada
+python agrupar_circuitos.py --input-dir /ruta/a/datos/entrada --algoritmo por-ramas
 
 # Especificar directorios de entrada y salida personalizados
-python agrupar_circuitos.py --input-dir /ruta/entrada --output-dir /ruta/salida
+python agrupar_circuitos.py --input-dir /ruta/entrada --output-dir /ruta/salida --algoritmo ambos
 
 # Ver ayuda
 python agrupar_circuitos.py --help
@@ -139,6 +149,54 @@ El script requiere los siguientes archivos CSV en el directorio de entrada:
 2. `nodos_circuito.csv`: Contiene información de los nodos de la red eléctrica
 
 Si los archivos no existen, el script creará datos de ejemplo automáticamente.
+
+### 🔀 Algoritmos de Agrupación
+
+El proyecto incluye dos algoritmos de agrupación con diferentes enfoques:
+
+#### Algoritmo Lineal (DFS Secuencial)
+
+**Características:**
+- Recorre la red de forma secuencial siguiendo el orden del DFS
+- Agrupa segmentos contiguos hasta alcanzar ~1km
+- Puede agrupar segmentos de diferentes ramas en el mismo grupo
+- Más simple y directo
+- Apropiado cuando la topología lineal es prioritaria
+
+**Uso:**
+```python
+# Método en la clase RedElectrica
+grupos = red.dfs_agrupar_segmentos(
+    longitud_objetivo_m=1000.0,  # 1km
+    tolerancia_km=0.2  # ±200m
+)
+```
+
+#### Algoritmo Por Ramas
+
+**Características:**
+- Identifica primero todas las ramas de la red
+- Agrupa segmentos dentro de cada rama independientemente
+- Respeta los límites naturales de las ramas (derivaciones)
+- Cada grupo pertenece a una sola rama
+- Más apropiado para análisis por rama o gestión independiente de ramas
+- Proporciona información adicional sobre la estructura de ramas (rama_id, nodo_inicio_rama, nodo_fin_rama)
+
+**Uso:**
+```python
+# Método en la clase RedElectrica
+grupos = red.dfs_por_ramas(
+    longitud_objetivo_m=1000.0,  # 1km
+    tolerancia_km=0.2  # ±200m
+)
+```
+
+#### Comparación de Resultados
+
+Cuando se usa `--algoritmo ambos`, el script genera un archivo `comparacion_algoritmos.txt` con:
+- Estadísticas comparativas (número de grupos, longitudes, desviación estándar)
+- Explicación de las diferencias clave entre ambos algoritmos
+- Recomendaciones sobre cuándo usar cada uno
 
 ### Salidas Generadas
 
@@ -181,13 +239,15 @@ print(f"Total segmentos: {len(df_segmentos)}")
 ```python
 import agrupar_circuitos
 
-# Ejecutar agrupación
+# Opción 1: Ejecutar agrupación con algoritmo lineal (default)
 result = agrupar_circuitos.main(
     input_dir='./data',
-    output_dir='./data'
+    output_dir='./data',
+    algoritmo='lineal'  # 'lineal', 'por-ramas', o 'ambos'
 )
 
 if result['success']:
+    print(f"Algoritmo usado: {result['algoritmo']}")
     print(f"Grupos generados: {result['stats']['num_grupos']}")
     print(f"Segmentos procesados: {result['stats']['num_segmentos']}")
     
@@ -198,8 +258,30 @@ if result['success']:
     # Acceder a los grupos
     for grupo_id, info in result['grupos'].items():
         print(f"Grupo {grupo_id}: {info['longitud_km']:.2f} km")
+        # Si usaste 'por-ramas', también puedes acceder a:
+        if 'rama_id' in info:
+            print(f"  Pertenece a Rama {info['rama_id']}")
 else:
     print(f"Error: {result['error']}")
+
+# Opción 2: Usar métodos directamente en la clase RedElectrica
+from agrupar_circuitos import RedElectrica, cargar_datos_csv
+
+df_segmentos, df_nodos = cargar_datos_csv('./data')
+red = RedElectrica()
+red.cargar_datos(df_segmentos, df_nodos)
+
+# Ejecutar algoritmo por ramas
+grupos_por_rama = red.dfs_por_ramas(
+    longitud_objetivo_m=1000.0,
+    tolerancia_km=0.2
+)
+
+# O ejecutar algoritmo lineal
+grupos_lineal = red.dfs_agrupar_segmentos(
+    longitud_objetivo_m=1000.0,
+    tolerancia_km=0.2
+)
 ```
 
 ### Ejemplo 3: Pipeline completo programático

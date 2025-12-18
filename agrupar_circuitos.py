@@ -34,6 +34,13 @@ def parse_arguments():
         default='./data',
         help='Directorio de salida para archivos generados (default: ./data)'
     )
+    parser.add_argument(
+        '--algoritmo',
+        type=str,
+        default='lineal',
+        choices=['lineal', 'por-ramas', 'ambos'],
+        help='Algoritmo de agrupación: "lineal" (DFS secuencial), "por-ramas" (agrupa por ramas), o "ambos" (ejecuta ambos y compara) (default: lineal)'
+    )
     return parser.parse_args()
 
 def cargar_datos_csv(input_dir):
@@ -104,7 +111,7 @@ class RedElectrica:
     
     def __init__(self):
         self.G = nx.Graph()
-        self.segmentos_por_grupo = defaultdict(list)
+        self.segmentos_por_grupo = {}  # Maps segmento_id -> grupo_id
         self.grupos = {}
         
     def cargar_datos(self, df_segmentos: pd.DataFrame, df_nodos: pd.DataFrame):
@@ -155,7 +162,7 @@ class RedElectrica:
         
         Args:
             longitud_objetivo_m: Longitud objetivo en metros (default: 1000m = 1km)
-            tolerancia_km: Tolerancia en kilómetros (default: ±200m)
+            tolerancia_km: Tolerancia como fracción (default: 0.2 = ±20% = ±200m para 1000m)
         """
         
         nodo_inicio = self.encontrar_subestacion_principal()
@@ -242,6 +249,230 @@ class RedElectrica:
             self._cerrar_grupo(grupo_actual, longitud_actual, grupo_id)
         
         return self.grupos
+    
+    def dfs_por_ramas(self, longitud_objetivo_m: float = 1000.0, 
+                      tolerancia_km: float = 0.2) -> Dict:
+        """
+        DFS para agrupar segmentos por ramas (branches) en grupos de ~1km.
+        
+        A diferencia de dfs_agrupar_segmentos que agrupa linealmente durante el recorrido,
+        este método identifica primero las ramas del circuito y luego agrupa los segmentos
+        dentro de cada rama independientemente.
+        
+        Una rama se define como un camino desde un punto de derivación (nodo con grado >= 3)
+        hasta un nodo terminal (nodo con grado == 1) o hasta otro punto de derivación.
+        
+        Args:
+            longitud_objetivo_m: Longitud objetivo en metros (default: 1000m = 1km)
+            tolerancia_km: Tolerancia como fracción (default: 0.2 = ±20% = ±200m para 1000m)
+            
+        Returns:
+            Dict con los grupos formados, incluyendo información de la rama
+        """
+        
+        nodo_inicio = self.encontrar_subestacion_principal()
+        
+        print(f"\n🎯 AGRUPANDO SEGMENTOS POR RAMAS EN GRUPOS DE ~{longitud_objetivo_m/1000}km")
+        print(f"   Tolerancia: ±{tolerancia_km*1000}m")
+        print("-" * 60)
+        
+        # Paso 1: Identificar puntos de derivación y nodos terminales
+        puntos_derivacion = set()
+        nodos_terminales = set()
+        
+        for nodo in self.G.nodes():
+            grado = self.G.degree(nodo)
+            if grado >= 3:
+                puntos_derivacion.add(nodo)
+                print(f"   📍 Punto de derivación: Nodo {nodo} (grado {grado})")
+            elif grado == 1:
+                nodos_terminales.add(nodo)
+                print(f"   🔚 Nodo terminal: Nodo {nodo}")
+        
+        # La subestación siempre es un punto de derivación
+        puntos_derivacion.add(nodo_inicio)
+        
+        # Paso 2: Identificar todas las ramas
+        ramas = self._identificar_ramas(nodo_inicio, puntos_derivacion, nodos_terminales)
+        
+        print(f"\n📊 Total de ramas identificadas: {len(ramas)}")
+        for i, rama in enumerate(ramas, 1):
+            longitud_rama = sum(s['longitud_m'] for s in rama['segmentos'])
+            print(f"   Rama {i}: {len(rama['segmentos'])} segmentos, "
+                  f"{longitud_rama:.1f}m ({longitud_rama/1000:.2f}km)")
+        
+        # Paso 3: Agrupar segmentos dentro de cada rama
+        print("\n🔄 AGRUPANDO SEGMENTOS POR RAMA:")
+        print("-" * 60)
+        
+        grupo_id = 1
+        self.grupos = {}
+        self.segmentos_por_grupo = {}  # Reset mapping
+        
+        for rama_id, rama in enumerate(ramas, 1):
+            print(f"\n   🌿 Procesando Rama {rama_id}:")
+            grupos_rama = self._agrupar_segmentos_rama(
+                rama['segmentos'], 
+                longitud_objetivo_m, 
+                tolerancia_km,
+                rama_id
+            )
+            
+            # Almacenar grupos con información de rama
+            for grupo in grupos_rama:
+                self.grupos[grupo_id] = {
+                    'segmentos': grupo['segmentos'],
+                    'longitud_total_m': grupo['longitud_total'],
+                    'num_segmentos': len(grupo['segmentos']),
+                    'longitud_km': grupo['longitud_total'] / 1000,
+                    'rama_id': rama_id,
+                    'nodo_inicio_rama': rama['nodo_inicio'],
+                    'nodo_fin_rama': rama['nodo_fin']
+                }
+                
+                # Almacenar relación inversa
+                for segmento in grupo['segmentos']:
+                    self.segmentos_por_grupo[segmento['segmento_id']] = grupo_id
+                
+                print(f"      ✅ Grupo {grupo_id} (Rama {rama_id}): "
+                      f"{len(grupo['segmentos'])} segmentos, "
+                      f"{grupo['longitud_total']:.1f}m "
+                      f"({grupo['longitud_total']/1000:.2f}km)")
+                grupo_id += 1
+        
+        return self.grupos
+    
+    def _identificar_ramas(self, nodo_inicio: int, puntos_derivacion: Set, 
+                          nodos_terminales: Set) -> List[Dict]:
+        """
+        Identificar todas las ramas de la red eléctrica.
+        
+        Una rama es un camino continuo entre:
+        - Un punto de derivación y un nodo terminal
+        - Dos puntos de derivación
+        - El nodo de inicio y un punto de derivación/terminal
+        
+        Args:
+            nodo_inicio: Nodo desde donde iniciar (subestación)
+            puntos_derivacion: Set de nodos con grado >= 3
+            nodos_terminales: Set de nodos con grado == 1
+            
+        Returns:
+            List de diccionarios con información de cada rama
+        """
+        ramas = []
+        visitados_global = set()
+        
+        # BFS para explorar todas las ramas
+        cola = deque([(nodo_inicio, None, [])])  # (nodo_actual, nodo_previo, segmentos_acumulados)
+        
+        while cola:
+            nodo_actual, nodo_previo, segmentos_camino = cola.popleft()
+            
+            # Condiciones para terminar una rama:
+            # 1. Nodo terminal (grado 1)
+            # 2. Punto de derivación (pero no el primero del camino)
+            es_fin_rama = (
+                nodo_actual in nodos_terminales or 
+                (nodo_actual in puntos_derivacion and len(segmentos_camino) > 0)
+            )
+            
+            if es_fin_rama and segmentos_camino:
+                # Guardar esta rama
+                ramas.append({
+                    'segmentos': segmentos_camino.copy(),
+                    'nodo_inicio': segmentos_camino[0]['nodo_inicio'] if segmentos_camino else nodo_previo,
+                    'nodo_fin': nodo_actual
+                })
+                
+                # Si es punto de derivación, continuar explorando desde aquí
+                if nodo_actual in puntos_derivacion:
+                    segmentos_camino = []  # Reiniciar camino
+                else:
+                    continue  # Si es terminal, no seguir
+            
+            # Explorar vecinos no visitados en esta dirección
+            for vecino in self.G.neighbors(nodo_actual):
+                if vecino == nodo_previo:
+                    continue  # No volver atrás
+                
+                # Crear identificador único para esta arista
+                arista_id = tuple(sorted([nodo_actual, vecino]))
+                
+                if arista_id not in visitados_global:
+                    visitados_global.add(arista_id)
+                    
+                    # Obtener información del segmento
+                    segmento_data = self.G.get_edge_data(nodo_actual, vecino)
+                    nuevo_segmento = {
+                        'segmento_id': segmento_data['id_segmento'],
+                        'longitud_m': segmento_data['longitud_m'],
+                        'nodo_inicio': nodo_actual,
+                        'nodo_fin': vecino
+                    }
+                    
+                    # Agregar a la cola con el camino actualizado
+                    nuevos_segmentos = segmentos_camino + [nuevo_segmento]
+                    cola.append((vecino, nodo_actual, nuevos_segmentos))
+        
+        return ramas
+    
+    def _agrupar_segmentos_rama(self, segmentos: List, longitud_objetivo_m: float, 
+                               tolerancia_km: float, rama_id: int) -> List[Dict]:
+        """
+        Agrupar segmentos de una rama específica en tramos de ~longitud_objetivo.
+        
+        Args:
+            segmentos: Lista de segmentos de la rama
+            longitud_objetivo_m: Longitud objetivo en metros
+            tolerancia_km: Tolerancia en kilómetros
+            rama_id: Identificador de la rama
+            
+        Returns:
+            Lista de grupos formados en esta rama
+        """
+        grupos = []
+        grupo_actual = []
+        longitud_actual = 0.0
+        
+        tolerancia_superior = longitud_objetivo_m * (1 + tolerancia_km)
+        tolerancia_inferior = longitud_objetivo_m * (1 - tolerancia_km)
+        
+        for segmento in segmentos:
+            longitud_segmento = segmento['longitud_m']
+            
+            # Verificar si agregar este segmento excede la tolerancia superior
+            if longitud_actual + longitud_segmento > tolerancia_superior:
+                # Cerrar grupo actual si tiene algo
+                if grupo_actual:
+                    grupos.append({
+                        'segmentos': grupo_actual.copy(),
+                        'longitud_total': longitud_actual
+                    })
+                    grupo_actual = []
+                    longitud_actual = 0.0
+            
+            # Agregar segmento al grupo actual
+            grupo_actual.append(segmento)
+            longitud_actual += longitud_segmento
+            
+            # Si alcanzamos el objetivo, cerrar grupo
+            if longitud_actual >= tolerancia_inferior:
+                grupos.append({
+                    'segmentos': grupo_actual.copy(),
+                    'longitud_total': longitud_actual
+                })
+                grupo_actual = []
+                longitud_actual = 0.0
+        
+        # Agregar último grupo si queda algo
+        if grupo_actual:
+            grupos.append({
+                'segmentos': grupo_actual.copy(),
+                'longitud_total': longitud_actual
+            })
+        
+        return grupos
     
     def _cerrar_grupo(self, segmentos: List, longitud_total: float, grupo_id: int):
         """Cerrar un grupo y almacenar la información"""
@@ -386,15 +617,112 @@ class RedElectrica:
         print(f"   • {segmentos_path}: {len(df_segmentos_grupo)} segmentos")
 
 # ============================================================================
-# 3. EJECUCIÓN PRINCIPAL
+# 3. COMPARACIÓN DE ALGORITMOS
 # ============================================================================
-def main(input_dir='./data', output_dir='./data'):
+def _comparar_algoritmos(grupos_lineal: Dict, grupos_ramas: Dict, output_dir: str):
+    """
+    Comparar resultados de ambos algoritmos y generar reporte
+    
+    Args:
+        grupos_lineal: Grupos generados por algoritmo lineal
+        grupos_ramas: Grupos generados por algoritmo por ramas
+        output_dir: Directorio para guardar el reporte
+    """
+    print("\n" + "=" * 70)
+    print("📊 COMPARACIÓN DE ALGORITMOS")
+    print("=" * 70)
+    
+    # Estadísticas básicas
+    longitudes_lineal = [g['longitud_total_m'] for g in grupos_lineal.values()]
+    longitudes_ramas = [g['longitud_total_m'] for g in grupos_ramas.values()]
+    
+    # Validar que haya datos para comparar
+    if not longitudes_lineal or not longitudes_ramas:
+        print("\n⚠️  No hay suficientes datos para comparar algoritmos")
+        return
+    
+    print("\n📈 COMPARACIÓN DE ESTADÍSTICAS:")
+    print("-" * 70)
+    print(f"{'Métrica':<30} {'Lineal':<20} {'Por Ramas':<20}")
+    print("-" * 70)
+    print(f"{'Total grupos':<30} {len(grupos_lineal):<20} {len(grupos_ramas):<20}")
+    print(f"{'Longitud promedio (km)':<30} {np.mean(longitudes_lineal)/1000:<20.2f} {np.mean(longitudes_ramas)/1000:<20.2f}")
+    print(f"{'Longitud mínima (km)':<30} {np.min(longitudes_lineal)/1000:<20.2f} {np.min(longitudes_ramas)/1000:<20.2f}")
+    print(f"{'Longitud máxima (km)':<30} {np.max(longitudes_lineal)/1000:<20.2f} {np.max(longitudes_ramas)/1000:<20.2f}")
+    print(f"{'Desviación estándar (km)':<30} {np.std(longitudes_lineal)/1000:<20.2f} {np.std(longitudes_ramas)/1000:<20.2f}")
+    print("-" * 70)
+    
+    # Diferencias clave
+    print("\n🔍 DIFERENCIAS CLAVE ENTRE ALGORITMOS:")
+    print("-" * 70)
+    print("""
+    ALGORITMO LINEAL (DFS Secuencial):
+    • Recorre la red de forma secuencial siguiendo el orden del DFS
+    • Agrupa segmentos contiguos hasta alcanzar ~1km
+    • Puede agrupar segmentos de diferentes ramas en el mismo grupo
+    • Más simple y directo
+    • Apropiado cuando la topología lineal es prioritaria
+    
+    ALGORITMO POR RAMAS:
+    • Identifica primero todas las ramas de la red
+    • Agrupa segmentos dentro de cada rama independientemente
+    • Respeta los límites naturales de las ramas (derivaciones)
+    • Cada grupo pertenece a una sola rama
+    • Más apropiado para análisis por rama o gestión independiente de ramas
+    • Proporciona información adicional sobre la estructura de ramas
+    """)
+    print("-" * 70)
+    
+    # Crear reporte en archivo
+    reporte_path = os.path.join(output_dir, 'comparacion_algoritmos.txt')
+    with open(reporte_path, 'w', encoding='utf-8') as f:
+        f.write("=" * 70 + "\n")
+        f.write("COMPARACIÓN DE ALGORITMOS DE AGRUPACIÓN\n")
+        f.write("=" * 70 + "\n\n")
+        
+        f.write("ESTADÍSTICAS COMPARATIVAS:\n")
+        f.write("-" * 70 + "\n")
+        f.write(f"{'Métrica':<30} {'Lineal':<20} {'Por Ramas':<20}\n")
+        f.write("-" * 70 + "\n")
+        f.write(f"{'Total grupos':<30} {len(grupos_lineal):<20} {len(grupos_ramas):<20}\n")
+        f.write(f"{'Longitud promedio (km)':<30} {np.mean(longitudes_lineal)/1000:<20.2f} {np.mean(longitudes_ramas)/1000:<20.2f}\n")
+        f.write(f"{'Longitud mínima (km)':<30} {np.min(longitudes_lineal)/1000:<20.2f} {np.min(longitudes_ramas)/1000:<20.2f}\n")
+        f.write(f"{'Longitud máxima (km)':<30} {np.max(longitudes_lineal)/1000:<20.2f} {np.max(longitudes_ramas)/1000:<20.2f}\n")
+        f.write(f"{'Desviación estándar (km)':<30} {np.std(longitudes_lineal)/1000:<20.2f} {np.std(longitudes_ramas)/1000:<20.2f}\n")
+        f.write("-" * 70 + "\n\n")
+        
+        f.write("DIFERENCIAS CLAVE:\n\n")
+        f.write("ALGORITMO LINEAL (DFS Secuencial):\n")
+        f.write("• Recorre la red de forma secuencial siguiendo el orden del DFS\n")
+        f.write("• Agrupa segmentos contiguos hasta alcanzar ~1km\n")
+        f.write("• Puede agrupar segmentos de diferentes ramas en el mismo grupo\n")
+        f.write("• Más simple y directo\n")
+        f.write("• Apropiado cuando la topología lineal es prioritaria\n\n")
+        
+        f.write("ALGORITMO POR RAMAS:\n")
+        f.write("• Identifica primero todas las ramas de la red\n")
+        f.write("• Agrupa segmentos dentro de cada rama independientemente\n")
+        f.write("• Respeta los límites naturales de las ramas (derivaciones)\n")
+        f.write("• Cada grupo pertenece a una sola rama\n")
+        f.write("• Más apropiado para análisis por rama o gestión independiente de ramas\n")
+        f.write("• Proporciona información adicional sobre la estructura de ramas\n")
+    
+    print(f"\n💾 Reporte de comparación guardado en: {reporte_path}")
+
+# ============================================================================
+# 4. EJECUCIÓN PRINCIPAL
+# ============================================================================
+def main(input_dir='./data', output_dir='./data', algoritmo='lineal'):
     """
     Función principal de ejecución
     
     Args:
         input_dir: Directorio de entrada para archivos CSV (default: './data')
         output_dir: Directorio de salida para archivos generados (default: './data')
+        algoritmo: Algoritmo de agrupación a usar (default: 'lineal')
+                   - 'lineal': DFS secuencial (algoritmo original)
+                   - 'por-ramas': DFS agrupando por ramas
+                   - 'ambos': Ejecuta ambos y compara resultados
         
     Returns:
         Dict con resultados del proceso:
@@ -407,6 +735,7 @@ def main(input_dir='./data', output_dir='./data'):
                 'num_segmentos': int,
                 'num_nodos': int
             },
+            'algoritmo': str,
             'error': str (optional, only if success=False)
         }
     """
@@ -437,12 +766,51 @@ def main(input_dir='./data', output_dir='./data'):
         print("🔄 EJECUTANDO DFS PARA AGRUPAR SEGMENTOS")
         print("=" * 70)
         
-        # Opción 1: DFS simple (agrupa a lo largo del recorrido)
-        grupos = red.dfs_agrupar_segmentos(
-            longitud_objetivo_m=1000.0,  # 1km
-            tolerancia_km=0.1  # ±100m
-        )
-        
+        # Ejecutar algoritmo según parámetro
+        if algoritmo == 'lineal':
+            print("\n📊 Ejecutando algoritmo LINEAL (DFS secuencial)")
+            grupos = red.dfs_agrupar_segmentos(
+                longitud_objetivo_m=1000.0,  # 1km
+                tolerancia_km=0.2  # ±200m
+            )
+        elif algoritmo == 'por-ramas':
+            print("\n🌿 Ejecutando algoritmo POR RAMAS")
+            grupos = red.dfs_por_ramas(
+                longitud_objetivo_m=1000.0,  # 1km
+                tolerancia_km=0.2  # ±200m
+            )
+        elif algoritmo == 'ambos':
+            # Ejecutar ambos algoritmos y comparar
+            print("\n🔀 Ejecutando AMBOS algoritmos para comparación")
+            
+            # Algoritmo 1: Lineal
+            print("\n" + "=" * 70)
+            print("1️⃣  ALGORITMO LINEAL (DFS Secuencial)")
+            print("=" * 70)
+            grupos_lineal = red.dfs_agrupar_segmentos(
+                longitud_objetivo_m=1000.0,
+                tolerancia_km=0.2
+            )
+            
+            # Crear nueva instancia para algoritmo por ramas
+            red_por_ramas = RedElectrica()
+            red_por_ramas.cargar_datos(df_segmentos, df_nodos)
+            
+            # Algoritmo 2: Por ramas
+            print("\n" + "=" * 70)
+            print("2️⃣  ALGORITMO POR RAMAS")
+            print("=" * 70)
+            grupos_ramas = red_por_ramas.dfs_por_ramas(
+                longitud_objetivo_m=1000.0,
+                tolerancia_km=0.2
+            )
+            
+            # Comparar resultados
+            _comparar_algoritmos(grupos_lineal, grupos_ramas, output_dir)
+            
+            # Usar el algoritmo por ramas como resultado final (sobreescribir red con red_por_ramas)
+            grupos = grupos_ramas
+            red = red_por_ramas
         
         # 3. Analizar resultados
         red.analizar_resultados(output_dir)
@@ -517,6 +885,7 @@ def main(input_dir='./data', output_dir='./data'):
             'success': True,
             'grupos': red.grupos,
             'red': red,
+            'algoritmo': algoritmo,
             'stats': {
                 'num_grupos': len(red.grupos),
                 'num_segmentos': len(df_segmentos),
@@ -550,6 +919,7 @@ if __name__ == "__main__":
     args = parse_arguments()
     input_dir = args.input_dir
     output_dir = args.output_dir
+    algoritmo = args.algoritmo
     
     # Validar y crear directorios
     if not os.path.exists(input_dir):
@@ -566,9 +936,10 @@ if __name__ == "__main__":
     print(f"\n⚙️  CONFIGURACIÓN:")
     print(f"   • Directorio de entrada: {input_dir}")
     print(f"   • Directorio de salida: {output_dir}")
+    print(f"   • Algoritmo: {algoritmo}")
     
     # Ejecutar proceso principal
-    result = main(input_dir, output_dir)
+    result = main(input_dir, output_dir, algoritmo)
     
     # Exit with appropriate code
     import sys
